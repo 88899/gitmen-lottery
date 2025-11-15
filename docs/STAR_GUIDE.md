@@ -22,7 +22,7 @@
 
 ### 方法一：点击页面右上角
 
-1. 打开项目主页：https://github.com/your-username/lottery-prediction
+1. 打开项目主页：https://github.com/88899/gitmen-lottery
 2. 点击右上角的 **⭐ Star** 按钮
 3. 完成！
 
@@ -67,6 +67,6 @@
 
 ---
 
-[![GitHub stars](https://img.shields.io/github/stars/your-username/lottery-prediction?style=for-the-badge&logo=github)](https://github.com/your-username/lottery-prediction/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/88899/gitmen-lottery?style=for-the-badge&logo=github)](https://github.com/88899/gitmen-lottery/stargazers)
 
-[⭐ 立即 Star](https://github.com/your-username/lottery-prediction) | [🔙 返回主页](../README.md)
+[⭐ 立即 Star](https://github.com/88899/gitmen-lottery) | [🔙 返回主页](../README.md)

@@ -8,12 +8,12 @@ README.md 中有多处需要替换为你的实际 GitHub 用户名和仓库名�
 
 在 README.md 中搜索并替换以下内容：
 
-**替换 `your-username` 为你的 GitHub 用户名**
+**替换 `88899` 为你的 GitHub 用户名**
 
 ```bash
 # 使用命令行批量替换
-sed -i '' 's/your-username/你的用户名/g' README.md
-sed -i '' 's/your-username/你的用户名/g' docs/STAR_GUIDE.md
+sed -i '' 's/88899/你的用户名/g' README.md
+sed -i '' 's/88899/你的用户名/g' docs/STAR_GUIDE.md
 
 # 或者手动替换以下位置：
 ```
@@ -22,39 +22,39 @@ sed -i '' 's/your-username/你的用户名/g' docs/STAR_GUIDE.md
 
 - [ ] 顶部 badges 链接（6处）
   ```markdown
-  https://github.com/your-username/lottery-prediction
+  https://github.com/88899/gitmen-lottery
   ```
 
 - [ ] Star 按钮链接（3处）
   ```markdown
-  [⭐ 点击 Star](https://github.com/your-username/lottery-prediction)
+  [⭐ 点击 Star](https://github.com/88899/gitmen-lottery)
   ```
 
 - [ ] 问题反馈链接（2处）
   ```markdown
-  https://github.com/your-username/lottery-prediction/issues
+  https://github.com/88899/gitmen-lottery/issues
   ```
 
 - [ ] Star History 图表（2处）
   ```markdown
-  your-username/lottery-prediction
+  88899/gitmen-lottery
   ```
 
 - [ ] 底部作者链接（1处）
   ```markdown
-  [Your Name](https://github.com/your-username)
+  [88899](https://github.com/88899)
   ```
 
 ### 快速替换命令
 
 ```bash
 # macOS
-sed -i '' 's/your-username/你的GitHub用户名/g' README.md
-sed -i '' 's/Your Name/你的名字/g' README.md
+sed -i '' 's/88899/你的GitHub用户名/g' README.md
+sed -i '' 's/88899/你的名字/g' README.md
 
 # Linux
-sed -i 's/your-username/你的GitHub用户名/g' README.md
-sed -i 's/Your Name/你的名字/g' README.md
+sed -i 's/88899/你的GitHub用户名/g' README.md
+sed -i 's/88899/你的名字/g' README.md
 ```
 
 ## 🎨 可选优化
@@ -80,7 +80,7 @@ sed -i 's/Your Name/你的名字/g' README.md
 cat > LICENSE << 'EOF'
 MIT License
 
-Copyright (c) 2025 Your Name
+Copyright (c) 2025 88899
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -202,8 +202,8 @@ statistics
 
 上传到 GitHub 前：
 
-- [ ] 替换所有 `your-username`
-- [ ] 替换所有 `Your Name`
+- [ ] 替换所有 `88899`
+- [ ] 替换所有 `88899`
 - [ ] 添加 LICENSE 文件
 - [ ] 检查所有链接是否正确
 - [ ] 测试 badges 是否显示

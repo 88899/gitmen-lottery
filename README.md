@@ -4,9 +4,9 @@
 
 **基于历史数据的智能彩票号码预测系统 | 支持 Docker 多容器部署**
 
-[![GitHub stars](https://img.shields.io/github/stars/your-username/lottery-prediction?style=social)](https://github.com/your-username/lottery-prediction/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/your-username/lottery-prediction?style=social)](https://github.com/your-username/lottery-prediction/network/members)
-[![GitHub watchers](https://img.shields.io/github/watchers/your-username/lottery-prediction?style=social)](https://github.com/your-username/lottery-prediction/watchers)
+[![GitHub stars](https://img.shields.io/github/stars/88899/gitmen-lottery?style=social)](https://github.com/88899/gitmen-lottery/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/88899/gitmen-lottery?style=social)](https://github.com/88899/gitmen-lottery/network/members)
+[![GitHub watchers](https://img.shields.io/github/watchers/88899/gitmen-lottery?style=social)](https://github.com/88899/gitmen-lottery/watchers)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
@@ -18,7 +18,7 @@
 
 **你的 Star 是我持续更新的动力！** 🚀
 
-[⭐ 点击 Star](https://github.com/your-username/lottery-prediction) | [🐛 报告问题](https://github.com/your-username/lottery-prediction/issues) | [💡 功能建议](https://github.com/your-username/lottery-prediction/issues/new)
+[⭐ 点击 Star](https://github.com/88899/gitmen-lottery) | [🐛 报告问题](https://github.com/88899/gitmen-lottery/issues) | [💡 功能建议](https://github.com/88899/gitmen-lottery/issues/new)
 
 ---
 
@@ -379,9 +379,9 @@ MIT License
 ## 📞 支持
 
 - 📖 [完整文档](docs/INDEX.md)
-- 🐛 [问题反馈](https://github.com/your-username/lottery-prediction/issues)
-- 💬 [讨论区](https://github.com/your-username/lottery-prediction/discussions)
-- ⭐ [给个 Star](https://github.com/your-username/lottery-prediction)
+- 🐛 [问题反馈](https://github.com/88899/gitmen-lottery/issues)
+- 💬 [讨论区](https://github.com/88899/gitmen-lottery/discussions)
+- ⭐ [给个 Star](https://github.com/88899/gitmen-lottery)
 
 ---
 
@@ -389,13 +389,13 @@ MIT License
 
 ## ⭐ Star 历史
 
-[![Star History Chart](https://api.star-history.com/svg?repos=your-username/lottery-prediction&type=Date)](https://star-history.com/#your-username/lottery-prediction&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=88899/gitmen-lottery&type=Date)](https://star-history.com/#88899/gitmen-lottery&Date)
 
 ### 🌟 如果这个项目帮助到了你，请不要吝啬你的 Star！
 
 **你的支持是我最大的动力！** 💪
 
-[![GitHub stars](https://img.shields.io/github/stars/your-username/lottery-prediction?style=for-the-badge&logo=github)](https://github.com/your-username/lottery-prediction/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/88899/gitmen-lottery?style=for-the-badge&logo=github)](https://github.com/88899/gitmen-lottery/stargazers)
 
 ---
 
@@ -406,7 +406,7 @@ MIT License
 
 ---
 
-Made with ❤️ by [Your Name](https://github.com/your-username)
+Made with ❤️ by [88899](https://github.com/88899)
 
 **如果觉得不错，请点击右上角 ⭐ Star 支持一下！**
 
