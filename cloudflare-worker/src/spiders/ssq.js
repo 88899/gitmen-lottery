@@ -430,39 +430,58 @@ export class SSQSpider {
     await this.randomDelay();
     
     let endIssue500; // 5位格式
-    let yearPrefix; // 年份前缀
-    let endNum; // 期数
+    let startIssue500; // 5位格式
     
     if (startIssue) {
-      // 如果指定了起始期号（7位格式，如 2025132）
-      // 需要从该期号往前爬取，所以 end = startIssue - 1
-      yearPrefix = startIssue.substring(2, 4); // 2025132 -> 25
-      const issueNum = parseInt(startIssue.substring(4)); // 2025132 -> 132
+      // 如果指定了起始期号（7位格式，如 2025001）
+      const year = parseInt(startIssue.substring(0, 4)); // 2025
+      const yearPrefix = startIssue.substring(2, 4); // 25
+      const issueNum = parseInt(startIssue.substring(4)); // 001
       
       // 往前一期
-      endNum = issueNum - 1;
+      let endNum = issueNum - 1;
+      let endYear = year;
+      let endYearPrefix = yearPrefix;
       
       if (endNum < 1) {
-        // 如果已经是第一期，无法再往前
-        console.log(`期号 ${startIssue} 已经是该年第一期，无法继续往前`);
-        return [];
+        // 跨年：从上一年开始
+        endYear = year - 1;
+        endYearPrefix = endYear.toString().substring(2); // 2024 -> 24
+        endNum = 153; // 假设每年最多 153 期
+        
+        console.log(`跨年：从 ${year} 年第 1 期往前到 ${endYear} 年`);
+        
+        // 检查是否已经到达双色球开始年份（2003年）
+        if (endYear < 2003) {
+          console.log(`已到达双色球开始年份（2003年），无法继续往前`);
+          return [];
+        }
       }
       
-      endIssue500 = yearPrefix + endNum.toString().padStart(3, '0');
-      console.log(`从数据库最旧期号 ${startIssue} 往前，查询到 ${yearPrefix}${endNum.toString().padStart(3, '0')}`);
+      endIssue500 = endYearPrefix + endNum.toString().padStart(3, '0');
+      
+      // 计算开始期号（往前推 batchSize 期）
+      let startNum = endNum - batchSize + 1;
+      if (startNum < 1) startNum = 1;
+      
+      startIssue500 = endYearPrefix + startNum.toString().padStart(3, '0');
+      
+      console.log(`从数据库最旧期号 ${startIssue} 往前，查询 ${startIssue500} - ${endIssue500}`);
     } else {
       // 如果没有指定，获取最新期号
       const latestIssue = await this.getLatestIssueFrom500();
       endIssue500 = latestIssue.substring(2);
-      yearPrefix = endIssue500.substring(0, 2);
-      endNum = parseInt(endIssue500.substring(2));
+      const yearPrefix = endIssue500.substring(0, 2);
+      const endNum = parseInt(endIssue500.substring(2));
+      
+      // 计算开始期号（往前推 batchSize 期）
+      let startNum = endNum - batchSize + 1;
+      if (startNum < 1) startNum = 1;
+      
+      startIssue500 = yearPrefix + startNum.toString().padStart(3, '0');
+      
+      console.log(`获取最新数据，查询 ${startIssue500} - ${endIssue500}`);
     }
-    
-    // 计算开始期号（往前推 batchSize 期）
-    let startNum = endNum - batchSize + 1;
-    if (startNum < 1) startNum = 1;
-    
-    const startIssue500 = yearPrefix + startNum.toString().padStart(3, '0');
     
     console.log(`500.com 查询期号范围: ${startIssue500} - ${endIssue500}`);
     
@@ -609,7 +628,9 @@ export class SSQSpider {
       while (true) {
         await this.randomDelay();
         
+        const timestamp = Date.now();
         const params = new URLSearchParams({
+          callback: `jQuery${Math.random().toString().replace('.', '')}${timestamp}`,
           transactionType: '10001001',
           lotteryId: '1',
           issueCount: '0',
@@ -620,14 +641,17 @@ export class SSQSpider {
           type: '2',
           pageNum: pageNum.toString(),
           pageSize: pageSize.toString(),
-          tt: Math.random().toString()
+          tt: Math.random().toString(),
+          _: timestamp.toString()
         });
 
         const response = await fetch(`${this.apiUrl}?${params}`, {
           headers: {
-            'User-Agent': this.headers['User-Agent'],
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.zhcw.com/',
-            'Accept': 'application/json, text/plain, */*'
+            'Accept': '*/*',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br'
           }
         });
 
