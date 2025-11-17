@@ -240,19 +240,17 @@ export default {
           allData = await spider.fetchByDateRange(startDateStr, endDateStr);
           console.log(`查询到 ${allData.length} 条数据`);
         } else {
-          // 如果数据库为空，获取最近 6 个月的数据
-          const endDate = new Date();
-          const startDate = new Date();
-          startDate.setMonth(startDate.getMonth() - 6);
+          // 如果数据库为空，使用备用数据源（500.com）获取最新数据
+          console.log(`数据库为空，从备用数据源（500.com）获取最新数据...`);
           
-          const startDateStr = startDate.toISOString().split('T')[0];
-          const endDateStr = endDate.toISOString().split('T')[0];
-          
-          console.log(`数据库为空，查询最近 6 个月数据`);
-          console.log(`查询日期范围: ${startDateStr} 至 ${endDateStr}`);
-          
-          allData = await spider.fetchByDateRange(startDateStr, endDateStr);
-          console.log(`查询到 ${allData.length} 条数据`);
+          try {
+            // 500.com 不带参数返回最近 30 期
+            allData = await spider.fetchAllFrom500(30);
+            console.log(`从 500.com 获取到 ${allData.length} 条数据`);
+          } catch (error) {
+            console.log(`备用数据源失败: ${error.message}`);
+            allData = [];
+          }
         }
         
         if (allData.length === 0) {
