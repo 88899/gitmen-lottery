@@ -235,12 +235,13 @@ export class SSQSpider {
   /**
    * 获取全量历史数据（分批获取）
    * @param {number} maxCount - 最大获取数量，null 表示获取所有数据（真正的全量）
+   * @param {string} startIssue - 起始期号（可选），如果指定则从该期号往前爬取
    */
-  async fetchAll(maxCount = null) {
+  async fetchAll(maxCount = null, startIssue = null) {
     // 先尝试主数据源
     try {
       console.log('尝试从主数据源获取全量数据...');
-      return await this.fetchAllFromZhcw(maxCount);
+      return await this.fetchAllFromZhcw(maxCount, startIssue);
     } catch (error) {
       console.error('主数据源失败:', error.message);
       
@@ -258,42 +259,65 @@ export class SSQSpider {
   /**
    * 从中彩网获取全量数据
    * 注意：API 单次最多返回 1000 个期号，如果需要更多数据，需要多次请求
+   * @param {number} maxCount - 最大获取数量
+   * @param {string} startIssue - 起始期号（可选），如果指定则从该期号往前爬取
    */
-  async fetchAllFromZhcw(maxCount = null) {
+  async fetchAllFromZhcw(maxCount = null, startIssue = null) {
     const requestCount = maxCount || 10000; // 如果不限制，默认请求 10000 期（足够覆盖所有历史）
-    console.log(`开始从中彩网获取全量数据${maxCount ? `，最多 ${maxCount} 期` : '（所有历史数据）'}...`);
+    console.log(`开始从中彩网获取全量数据${maxCount ? `，最多 ${maxCount} 期` : '（所有历史数据）'}${startIssue ? `，从期号 ${startIssue} 往前爬取` : ''}...`);
     
-    await this.randomDelay();
+    let issues = [];
     
-    // 获取期号列表（API 单次最多 1000）
-    const params = new URLSearchParams({
-      transactionType: '10001003',
-      lotteryId: '1',
-      count: Math.min(requestCount, 1000).toString(),
-      tt: Date.now().toString()
-    });
+    if (startIssue) {
+      // 如果指定了起始期号，生成期号列表（从 startIssue 往前 maxCount 期）
+      const startNum = parseInt(startIssue);
+      const count = maxCount || 100;
+      
+      console.log(`生成期号列表：从 ${startIssue} 往前 ${count} 期...`);
+      
+      for (let i = 0; i < count; i++) {
+        const issueNum = startNum - i;
+        if (issueNum <= 0) break; // 期号不能为负数
+        
+        const issue = issueNum.toString().padStart(startIssue.length, '0');
+        issues.push(issue);
+      }
+      
+      console.log(`生成了 ${issues.length} 个期号，范围: ${issues[issues.length - 1]} - ${issues[0]}`);
+    } else {
+      // 如果没有指定起始期号，从 API 获取最新的期号列表
+      await this.randomDelay();
+      
+      // 获取期号列表（API 单次最多 1000）
+      const params = new URLSearchParams({
+        transactionType: '10001003',
+        lotteryId: '1',
+        count: Math.min(requestCount, 1000).toString(),
+        tt: Date.now().toString()
+      });
 
-    const response = await fetch(`${this.apiUrl}?${params}`, {
-      headers: this.headers
-    });
+      const response = await fetch(`${this.apiUrl}?${params}`, {
+        headers: this.headers
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const text = await response.text();
+      if (!text || text.trim() === '') {
+        throw new Error('API 返回空响应');
+      }
+
+      const data = JSON.parse(text);
+      
+      if (data.resCode !== '000000') {
+        throw new Error(`API错误: ${data.resCode}`);
+      }
+
+      issues = data.issue || [];
+      console.log(`从 API 获取到 ${issues.length} 个期号`);
     }
-
-    const text = await response.text();
-    if (!text || text.trim() === '') {
-      throw new Error('API 返回空响应');
-    }
-
-    const data = JSON.parse(text);
-    
-    if (data.resCode !== '000000') {
-      throw new Error(`API错误: ${data.resCode}`);
-    }
-
-    const issues = data.issue || [];
-    console.log(`获取到 ${issues.length} 个期号`);
 
     if (issues.length === 0) {
       throw new Error('未获取到期号列表');

@@ -205,7 +205,7 @@ export default {
     
     // 初始化数据库（全量爬取模式）
     // 用途：首次运行时批量导入历史数据
-    // 特点：每次爬取固定数量，存在的跳过，不存在的写入
+    // 特点：每次爬取固定数量，从数据库最旧的期号往前爬，自动去重
     if (url.pathname === '/init' && request.method === 'POST') {
       try {
         const db = new Database(env.DB);
@@ -215,9 +215,22 @@ export default {
         
         // 每次爬取 100 期（避免超时）
         const batchSize = 100;
-        console.log(`开始全量爬取模式，本次爬取 ${batchSize} 期...`);
         
-        const allData = await spider.fetchAll(batchSize);
+        // 获取数据库中最旧的期号
+        const oldest = await db.getOldest('ssq');
+        let startIssue = null;
+        
+        if (oldest) {
+          // 如果数据库有数据，从最旧的期号往前爬
+          const oldestNum = parseInt(oldest.lottery_no);
+          startIssue = (oldestNum - 1).toString().padStart(oldest.lottery_no.length, '0');
+          console.log(`数据库最旧期号: ${oldest.lottery_no}，本次从 ${startIssue} 往前爬取 ${batchSize} 期...`);
+        } else {
+          // 如果数据库为空，从最新开始爬
+          console.log(`数据库为空，从最新数据开始爬取 ${batchSize} 期...`);
+        }
+        
+        const allData = await spider.fetchAll(batchSize, startIssue);
         console.log(`爬取到 ${allData.length} 条数据`);
         
         if (allData.length === 0) {
@@ -225,7 +238,7 @@ export default {
             JSON.stringify({
               success: false,
               message: '未获取到数据',
-              total: 0
+              total: await db.getCount('ssq')
             }),
             {
               headers: { 'Content-Type': 'application/json; charset=utf-8' }
