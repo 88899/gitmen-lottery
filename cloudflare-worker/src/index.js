@@ -237,19 +237,38 @@ export default {
           console.log(`查询日期范围: ${startDateStr} 至 ${endDateStr}`);
           
           // 按日期范围查询（查到多少就返回多少）
-          allData = await spider.fetchByDateRange(startDateStr, endDateStr);
-          console.log(`查询到 ${allData.length} 条数据`);
+          try {
+            allData = await spider.fetchByDateRange(startDateStr, endDateStr);
+            console.log(`从主数据源查询到 ${allData.length} 条数据`);
+          } catch (error) {
+            console.log(`主数据源失败: ${error.message}，尝试备用数据源...`);
+            // 主数据源失败，尝试备用数据源
+            try {
+              allData = await spider.fetchAllFrom500(100);
+              console.log(`从备用数据源获取到 ${allData.length} 条数据`);
+            } catch (backupError) {
+              console.log(`备用数据源也失败: ${backupError.message}`);
+              allData = [];
+            }
+          }
         } else {
-          // 如果数据库为空，使用备用数据源（500.com）获取最新数据
-          console.log(`数据库为空，从备用数据源（500.com）获取最新数据...`);
+          // 如果数据库为空，获取最新数据
+          console.log(`数据库为空，获取最新数据...`);
           
           try {
-            // 500.com 不带参数返回最近 30 期
-            allData = await spider.fetchAllFrom500(30);
-            console.log(`从 500.com 获取到 ${allData.length} 条数据`);
+            // 先尝试主数据源
+            allData = await spider.fetchAll(100);
+            console.log(`从主数据源获取到 ${allData.length} 条数据`);
           } catch (error) {
-            console.log(`备用数据源失败: ${error.message}`);
-            allData = [];
+            console.log(`主数据源失败: ${error.message}，尝试备用数据源...`);
+            // 主数据源失败，尝试备用数据源（500.com）
+            try {
+              allData = await spider.fetchAllFrom500(30);
+              console.log(`从备用数据源获取到 ${allData.length} 条数据`);
+            } catch (backupError) {
+              console.log(`备用数据源也失败: ${backupError.message}`);
+              allData = [];
+            }
           }
         }
         
