@@ -98,6 +98,108 @@ class SSQSpider:
         # 所有数据源都失败
         raise Exception("所有数据源均失败，无法获取数据")
 
+    def fetch_batch_init(self, batch_size: int = 100) -> List[Dict]:
+        """批量初始化：每次爬取固定数量的数据（用于首次初始化）
+        
+        特点：
+        - 固定批次大小
+        - 不关心数据库状态
+        - 可重复执行
+        - 自动去重由数据库处理
+        
+        Args:
+            batch_size: 每批次爬取的数量（默认100期）
+            
+        Returns:
+            爬取到的数据列表
+        """
+        logger.info(f"开始批量初始化模式，本次爬取 {batch_size} 期...")
+        
+        try:
+            # 使用 API 获取指定数量的数据
+            data = self.fetch_api_recent(max_count=batch_size)
+            
+            if data and len(data) > 0:
+                logger.info(f"批量初始化成功，获取 {len(data)} 条数据")
+                return data
+            else:
+                logger.warning("批量初始化未获取到数据")
+                return []
+                
+        except Exception as e:
+            logger.error(f"批量初始化失败: {e}")
+            raise
+
+    def fetch_incremental(self, db_latest_no: str) -> List[Dict]:
+        """增量更新：从数据库最新期号开始，爬取到线上最新期号
+        
+        逻辑：从数据库最新期号的下一期开始，往后爬到线上最新期号
+        避免漏掉中间的数据
+        
+        Args:
+            db_latest_no: 数据库中最新的期号（如 '2025120'）
+            
+        Returns:
+            新增的中奖数据列表
+        """
+        logger.info(f"开始增量更新，数据库最新期号: {db_latest_no}")
+        
+        # 获取线上最新期号
+        try:
+            online_latest = self.fetch_latest(count=1)
+            if not online_latest or len(online_latest) == 0:
+                logger.warning("未获取到线上最新数据")
+                return []
+            
+            online_latest_no = online_latest[0]['lottery_no']
+            logger.info(f"线上最新期号: {online_latest_no}")
+            
+            # 如果期号相同，说明已是最新
+            if db_latest_no == online_latest_no:
+                logger.info("数据已是最新，无需更新")
+                return []
+            
+            # 计算需要爬取的期号范围
+            db_issue_num = int(db_latest_no)
+            online_issue_num = int(online_latest_no)
+            
+            if db_issue_num >= online_issue_num:
+                logger.warning(f"数据库期号({db_latest_no})大于等于线上期号({online_latest_no})，无需更新")
+                return []
+            
+            logger.info(f"需要爬取期号范围: {db_issue_num + 1} 到 {online_issue_num}")
+            
+            # 逐个爬取缺失的期号
+            new_data_list = []
+            for issue_num in range(db_issue_num + 1, online_issue_num + 1):
+                current_issue = str(issue_num).zfill(len(db_latest_no))
+                
+                try:
+                    issue_data = self.fetch_api_issue(current_issue)
+                    if issue_data:
+                        logger.info(f"获取到新数据: {current_issue}")
+                        new_data_list.append(issue_data)
+                    else:
+                        logger.warning(f"期号 {current_issue} 未找到数据，跳过")
+                except Exception as e:
+                    logger.error(f"获取期号 {current_issue} 失败: {e}")
+                    continue
+                
+                # 安全限制：最多爬取 100 期
+                if len(new_data_list) >= 100:
+                    logger.warning("已爬取 100 期，停止")
+                    break
+                
+                # 防止请求过快
+                time.sleep(0.1)
+            
+            logger.info(f"增量更新完成，共获取 {len(new_data_list)} 条新数据")
+            return new_data_list
+            
+        except Exception as e:
+            logger.error(f"增量更新失败: {e}")
+            raise
+
     def fetch_page(self, page: int = 1) -> str:
         """
         获取分页数据（HTML形式）

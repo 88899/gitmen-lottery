@@ -43,97 +43,58 @@ async function runDailyTask(env) {
     const spider = new SSQSpider();
     const predictor = new SSQPredictor(db);
     
-    // 检查数据库中是否有数据
-    const dataCount = await db.getCount('ssq');
-    console.log(`数据库中现有数据: ${dataCount} 条`);
+    // /run 接口专注于增量更新
+    // 用途：每日定时任务，检查并获取最新数据
+    // 特点：从数据库最新期号开始，往后爬取到线上最新期号
     
-    // 首次运行：爬取全量数据（分批处理，避免超时）
-    if (dataCount === 0) {
-      console.log('检测到首次运行，开始爬取历史数据...');
-      await telegram.sendMessage(
-        '🚀 系统首次运行，开始初始化历史数据...\n\n' +
-        '⚠️ 由于数据量大，将分批爬取\n' +
-        '建议：多次手动触发 /run 直到数据完整'
-      );
-      
-      // 每次只爬取 100 期，避免超时
-      const batchSize = 100;
-      const allData = await spider.fetchAll(batchSize);
-      console.log(`本次爬取到 ${allData.length} 条历史数据`);
-      
-      if (allData.length === 0) {
-        return {
-          success: false,
-          message: '未获取到数据',
-          mode: 'full'
-        };
-      }
-      
-      const result = await db.batchInsert('ssq', allData);
-      console.log(`批量插入完成: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条`);
-      
-      await telegram.sendMessage(
-        `✅ 本批次数据导入完成\n\n` +
-        `新增: ${result.inserted} 条\n` +
-        `跳过: ${result.skipped} 条\n` +
-        `总计: ${allData.length} 条\n\n` +
-        `💡 提示：请继续手动触发 /run\n` +
-        `直到提示"数据已是最新"`
-      );
-      
-      return {
-        success: true,
-        message: '首次运行完成（分批模式）',
-        mode: 'full',
-        inserted: result.inserted,
-        skipped: result.skipped,
-        batch_size: batchSize
-      };
-    }
-    
-    // 后续运行：智能增量爬取
-    console.log('开始智能增量爬取...');
+    console.log('开始增量更新模式...');
     
     // 获取数据库中最新的期号
     const latestInDb = await db.getLatest('ssq');
-    const latestLotteryNo = latestInDb ? latestInDb.lottery_no : null;
-    console.log(`数据库最新期号: ${latestLotteryNo}`);
+    const dbLotteryNo = latestInDb ? latestInDb.lottery_no : null;
+    console.log(`数据库最新期号: ${dbLotteryNo}`);
     
-    // 爬取最新数据
+    // 爬取线上最新数据
     const latestOnline = await spider.fetchLatest();
     if (!latestOnline) {
       console.log('未获取到线上最新数据');
       return { success: false, message: '未获取到线上数据' };
     }
     
-    console.log(`线上最新期号: ${latestOnline.lottery_no}`);
+    const onlineLotteryNo = latestOnline.lottery_no;
+    console.log(`线上最新期号: ${onlineLotteryNo}`);
     
     // 如果线上最新期号与数据库一致，说明没有新数据
-    if (latestLotteryNo === latestOnline.lottery_no) {
+    if (dbLotteryNo === onlineLotteryNo) {
       console.log('数据已是最新，无需更新');
       return { 
         success: true, 
         message: '数据已是最新', 
         mode: 'incremental',
-        lottery_no: latestLotteryNo 
+        lottery_no: dbLotteryNo 
       };
     }
     
     // 有新数据，开始增量爬取
+    // 策略：从数据库最新期号的下一期开始，往后爬到线上最新期号
     console.log('检测到新数据，开始增量爬取...');
     const newDataList = [];
-    let currentIssue = latestOnline.lottery_no;
-    let consecutiveNotFound = 0;
-    const maxNotFound = 3; // 连续3次未找到新数据则停止
     
-    // 从最新期号开始往前爬，直到遇到数据库中已有的数据
-    while (consecutiveNotFound < maxNotFound) {
-      // 检查当前期号是否已存在
-      const exists = await db.checkExists('ssq', currentIssue);
+    // 计算起始期号（数据库最新期号 + 1）
+    const dbIssueNum = parseInt(dbLotteryNo);
+    const onlineIssueNum = parseInt(onlineLotteryNo);
+    
+    console.log(`需要爬取期号范围: ${dbIssueNum + 1} 到 ${onlineIssueNum}`);
+    
+    // 从数据库最新期号的下一期开始，逐个爬取到线上最新期号
+    for (let issueNum = dbIssueNum + 1; issueNum <= onlineIssueNum; issueNum++) {
+      const currentIssue = issueNum.toString().padStart(dbLotteryNo.length, '0');
       
+      // 检查是否已存在（防止重复）
+      const exists = await db.checkExists('ssq', currentIssue);
       if (exists) {
-        console.log(`期号 ${currentIssue} 已存在，停止爬取`);
-        break;
+        console.log(`期号 ${currentIssue} 已存在，跳过`);
+        continue;
       }
       
       // 获取当前期号的数据
@@ -142,18 +103,8 @@ async function runDailyTask(env) {
       if (issueData) {
         console.log(`获取到新数据: ${currentIssue}`);
         newDataList.push(issueData);
-        consecutiveNotFound = 0;
-        
-        // 计算上一期期号（简单递减，实际可能需要更复杂的逻辑）
-        const issueNum = parseInt(currentIssue);
-        currentIssue = (issueNum - 1).toString().padStart(currentIssue.length, '0');
       } else {
-        consecutiveNotFound++;
-        console.log(`期号 ${currentIssue} 未找到数据，连续未找到次数: ${consecutiveNotFound}`);
-        
-        // 尝试上一期
-        const issueNum = parseInt(currentIssue);
-        currentIssue = (issueNum - 1).toString().padStart(currentIssue.length, '0');
+        console.log(`期号 ${currentIssue} 未找到数据，跳过`);
       }
       
       // 安全限制：最多爬取 100 期
@@ -252,43 +203,79 @@ export default {
       }
     }
     
-    // 初始化数据库
+    // 初始化数据库（全量爬取模式）
+    // 用途：首次运行时批量导入历史数据
+    // 特点：每次爬取固定数量，存在的跳过，不存在的写入
     if (url.pathname === '/init' && request.method === 'POST') {
       try {
         const db = new Database(env.DB);
         await db.init();
         
-        // 爬取全量数据
-        // 注意：由于 Cloudflare Worker 有 CPU 时间限制，建议使用分批模式（/run 接口）
-        // 如果要一次性获取更多数据，可以通过 ?count=5000 参数指定
         const spider = new SSQSpider();
-        const countParam = url.searchParams.get('count');
-        const maxCount = countParam ? parseInt(countParam) : null; // null 表示尽可能多
-        const allData = await spider.fetchAll(maxCount);
         
-        // 批量插入
+        // 每次爬取 100 期（避免超时）
+        const batchSize = 100;
+        console.log(`开始全量爬取模式，本次爬取 ${batchSize} 期...`);
+        
+        const allData = await spider.fetchAll(batchSize);
+        console.log(`爬取到 ${allData.length} 条数据`);
+        
+        if (allData.length === 0) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: '未获取到数据',
+              total: 0
+            }),
+            {
+              headers: { 'Content-Type': 'application/json; charset=utf-8' }
+            }
+          );
+        }
+        
+        // 批量插入（存在的自动跳过）
         const result = await db.batchInsert('ssq', allData);
+        const currentTotal = await db.getCount('ssq');
+        
+        console.log(`插入完成: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条，当前总计 ${currentTotal} 条`);
         
         // 发送通知
         if (config.telegramBotToken && config.telegramChatId) {
           const telegram = new TelegramBot(config.telegramBotToken, config.telegramChatId);
-          await telegram.sendInitComplete(result.inserted);
+          await telegram.sendMessage(
+            `✅ 批量导入完成\n\n` +
+            `新增: ${result.inserted} 条\n` +
+            `跳过: ${result.skipped} 条\n` +
+            `当前总计: ${currentTotal} 条\n\n` +
+            `💡 继续触发 /init 可导入更多历史数据`
+          );
         }
         
         return new Response(
-          `初始化完成\n\n` +
-          `新增: ${result.inserted} 条\n` +
-          `跳过: ${result.skipped} 条\n` +
-          `总计: ${allData.length} 条`,
+          JSON.stringify({
+            success: true,
+            message: '批量导入完成',
+            inserted: result.inserted,
+            skipped: result.skipped,
+            total: currentTotal,
+            batch_size: batchSize
+          }),
           {
-            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+            headers: { 'Content-Type': 'application/json; charset=utf-8' }
           }
         );
       } catch (error) {
-        return new Response(`初始化失败: ${error.message}`, {
-          status: 500,
-          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-        });
+        console.error('初始化失败:', error);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: error.message
+          }),
+          {
+            status: 500,
+            headers: { 'Content-Type': 'application/json; charset=utf-8' }
+          }
+        );
       }
     }
     

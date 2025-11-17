@@ -1,463 +1,233 @@
-<div align="center">
-
 # 🎰 彩票预测系统
 
-**基于历史数据的智能彩票号码预测系统 | 支持 Docker 和 Cloudflare Workers 部署**
+基于历史数据分析的彩票预测系统，支持双色球（SSQ）等多种彩票。
 
-[![GitHub stars](https://img.shields.io/github/stars/88899/gitmen-lottery?style=social)](https://github.com/88899/gitmen-lottery/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/88899/gitmen-lottery?style=social)](https://github.com/88899/gitmen-lottery/network/members)
-[![GitHub watchers](https://img.shields.io/github/watchers/88899/gitmen-lottery?style=social)](https://github.com/88899/gitmen-lottery/watchers)
+提供 **Cloudflare Workers** 和 **Python** 两个版本，满足不同场景需求。
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
-[![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
-[![Cloudflare Workers](https://img.shields.io/badge/cloudflare-workers-orange.svg)](https://workers.cloudflare.com/)
+## ✨ 特性
 
----
-
-### 🌟 如果这个项目对你有帮助，请点击右上角 ⭐ Star 支持一下！
-
-**你的 Star 是我持续更新的动力！** 🚀
-
-[⭐ 点击 Star](https://github.com/88899/gitmen-lottery) | [🐛 报告问题](https://github.com/88899/gitmen-lottery/issues) | [💡 功能建议](https://github.com/88899/gitmen-lottery/issues/new)
-
----
-
-## 🎉 新增 Cloudflare Workers 版本！
-
-现在提供两个版本供选择：
-
-| 版本 | 部署方式 | 费用 | 难度 | 推荐场景 |
-|------|---------|------|------|---------|
-| **Cloudflare Workers** ✨ | 无服务器 | **完全免费** | ⭐ 简单 | 无服务器，想要零成本运行 |
-| **Docker** | 自建服务器 | 服务器费用 | ⭐⭐⭐ 中等 | 已有服务器，需要完全控制 |
-
-### 🚀 Cloudflare Workers 版本（推荐新手）
-
-- ☁️ **无需服务器** - 完全托管在 Cloudflare 全球网络
-- 💰 **完全免费** - 使用 Cloudflare 免费套餐
-- ⚡ **5分钟部署** - 一条命令即可完成
-- 🌍 **全球加速** - Cloudflare CDN 加速
-- 🔄 **自动扩展** - 无需担心性能问题
-
-**快速开始：**
-```bash
-cd cloudflare-worker
-npm install
-npx wrangler login
-npm run deploy
-```
-
-📖 **详细文档：** [cloudflare-worker/部署指南.md](./cloudflare-worker/部署指南.md)
-
-### 🐳 Docker 版本（传统部署）
-
-- 🖥️ **完全控制** - 运行在自己的服务器上
-- 🔧 **高度定制** - 可以自由修改配置
-- 📊 **MySQL 数据库** - 使用传统关系型数据库
-
-**快速开始：**
-```bash
-cp .env.example .env
-nano .env  # 配置数据库和 Telegram
-cd deployment
-./deploy.sh
-```
-
-📖 **详细文档：** 见下方完整说明
-
----
-
-**📋 版本对比详情：** [CLOUDFLARE_WORKER_VERSION.md](./CLOUDFLARE_WORKER_VERSION.md)
-
----
-
-</div>
-
-## ⚠️ 免责声明
-
-**本项目仅供学习和研究使用，严禁用于任何商业或非法用途。**
-
-### 重要提示
-
-1. **纯属学习项目** - 本项目仅用于学习数据分析、机器学习和软件工程技术
-2. **无中奖保证** - 所有预测结果基于历史数据统计，不代表未来结果，不保证任何中奖概率
-3. **理性购彩** - 彩票具有随机性，请理性对待，切勿沉迷
-4. **风险自负** - 使用本项目产生的任何后果由使用者自行承担
-5. **遵守法律** - 请遵守所在地区关于彩票的法律法规
-
-### 法律声明
-
-- 本项目不提供任何形式的购彩建议或投资建议
-- 本项目不对使用者的任何损失负责
-- 本项目不鼓励、不支持任何形式的赌博行为
-- 使用本项目即表示您已阅读并同意本免责声明
-
-### 适用范围
-
-本项目适用于：
-- ✅ 学习数据分析和统计方法
-- ✅ 研究机器学习算法
-- ✅ 学习 Python 编程和 Docker 部署
-- ✅ 研究爬虫技术和数据处理
-
-本项目不适用于：
-- ❌ 商业用途
-- ❌ 赌博或投机
-- ❌ 任何违法活动
-- ❌ 向他人提供购彩建议
-
-**请理性对待彩票，远离赌博！**
-
----
-
-<div align="center">
-
-## 🎯 为什么选择这个项目？
-
-| 特点 | 说明 |
-|:---:|:---|
-| 🎓 **学习价值** | 完整的数据分析、机器学习、Docker 部署实战项目 |
-| 🏗️ **生产级架构** | 多容器部署、自动化任务、完善的错误处理 |
-| 📚 **文档完善** | 详细的部署指南、使用手册、架构说明 |
-| 🔧 **开箱即用** | 一键部署脚本，5分钟快速启动 |
-| 🔄 **持续更新** | 活跃维护，欢迎贡献代码 |
-
-### 💖 如果觉得有用，请给个 Star 吧！
-
-**已有 XXX 位开发者 Star 了这个项目** ⭐
-
-</div>
-
----
-
-## ✨ 核心特性
-
-- 🐳 **Docker 多容器部署** - 每个彩票类型独立容器
-- 📱 **Telegram 机器人通知** - 实时推送开奖和预测结果
-- ⏰ **自动定时任务** - 每天自动爬取和预测
-- 🔄 **增量数据更新** - 智能跳过已存在数据
-- 🛡️ **防封禁爬虫** - 模拟人类浏览行为
-- 📊 **数据分析** - 频率统计、连号分析
-
-## 📸 项目展示
-
-<div align="center">
-
-### 🎯 Telegram 通知效果
-
-```
-📊 双色球每日报告
-
-━━━━━━━━━━━━━━━
-🎰 最新开奖
-
-📅 期号: 2025131
-📆 日期: 2025-11-13
-
-🔴 红球: 03 13 14 18 24 31
-🔵 蓝球: 03
-
-━━━━━━━━━━━━━━━
-🔮 下期预测
-
-组合 1: 06 07 17 22 26 32 - 15
-组合 2: 06 08 17 22 26 32 - 15
-组合 3: 02 07 17 22 26 32 - 15
-
-━━━━━━━━━━━━━━━
-📈 统计信息
-
-高频红球: 17(765), 26(757), 14(755)
-高频蓝球: 15(270), 16(264), 1(258)
-```
-
-### 💡 觉得有用？给个 Star 吧！⭐
-
-</div>
-
----
+- 🔄 **双数据源**：中彩网 + 500.com，自动切换，稳定可靠
+- 🤖 **智能爬取**：全量初始化 + 增量更新，不漏数据
+- 📊 **多维预测**：频率分析、遗漏分析、冷热分析
+- 📱 **Telegram 通知**：实时推送开奖和预测结果
+- ☁️ **无服务器**：Cloudflare Workers 版本，完全免费
+- 🐍 **本地运行**：Python 版本，功能完整
 
 ## 🚀 快速开始
 
-### 前置要求
+### Cloudflare Workers 版本（推荐）
 
-- Docker 20.10+
-- Docker Compose 1.29+
-- Linux 服务器（推荐）
-
-### 一键部署
+**优势**：完全免费、自动扩展、全球 CDN
 
 ```bash
-# 1. 克隆项目
-git clone <repository_url>
-cd lottery-prediction
+# 1. 部署
+cd cloudflare-worker
+npx wrangler deploy
+
+# 2. 初始化数据
+bash scripts/init.sh
+
+# 3. 配置定时任务（在 Cloudflare Dashboard）
+```
+
+详细文档：[cloudflare-worker/README.md](./cloudflare-worker/README.md)
+
+### Python 版本
+
+**优势**：功能丰富、易于扩展、本地运行
+
+```bash
+# 1. 安装依赖
+pip install -r requirements.txt
 
 # 2. 配置环境
 cp .env.example .env
-nano .env  # 填入数据库和 Telegram 配置
+# 编辑 .env 文件
 
-# 3. 部署
-cd deployment
-./deploy.sh
+# 3. 初始化数据库
+python scripts/init_database.py
+
+# 4. 运行
+python lottery.py
 ```
 
-## 📖 文档导航
+详细文档：[docs/USAGE.md](./docs/USAGE.md)
 
-- **[⚠️ 免责声明](DISCLAIMER.md)** - 使用前必读 ⭐
-- **[文档索引](docs/INDEX.md)** - 完整的文档导航
-- **[部署指南](docs/deployment/DOCKER_DEPLOYMENT.md)** - Docker 部署详细步骤
-- **[Telegram 配置](docs/guides/TELEGRAM_SETUP.md)** - 机器人配置教程
-- **[使用手册](docs/USAGE.md)** - 完整的使用说明
-- **[项目设计](docs/PROJECT_DESIGN.md)** - 架构和设计理念
+## 📊 核心功能
 
-## 🎯 支持的彩票
+### 1. 数据爬取
 
-| 彩票类型 | 代码 | 容器名 | 状态 |
-|---------|------|--------|------|
-| 双色球 | ssq | lottery-ssq | ✅ 已实现 |
-| 大乐透 | dlt | lottery-dlt | 🚧 开发中 |
-| 快开3 | ks3 | lottery-ks3 | 🚧 开发中 |
+**双数据源架构**，自动切换：
+- 主源：中彩网 API（支持大量历史数据）
+- 备用源：500.com（稳定性高）
 
-## 🐳 Docker 部署
+**两种模式**：
+- **全量爬取**：首次初始化，获取所有历史数据
+- **增量更新**：日常运行，只获取新数据
 
-### 多容器架构
+### 2. 智能预测
 
-每个彩票类型运行在独立的容器中：
+基于历史数据的多维度分析：
+- 频率分析：统计每个号码的出现频率
+- 遗漏分析：计算号码的遗漏期数
+- 冷热分析：识别冷号和热号
+- 组合优化：生成最优号码组合
 
-```
-lottery-ssq    # 双色球容器
-lottery-dlt    # 大乐透容器
-lottery-ks3    # 快开3容器
-```
+### 3. 实时通知
 
-### 部署选项
+通过 Telegram Bot 推送：
+- 每日开奖结果
+- 预测号码推荐
+- 统计信息
+- 错误告警
 
-```bash
-# 仅部署双色球
-docker-compose up -d lottery-ssq
-
-# 部署双色球和大乐透
-docker-compose up -d lottery-ssq lottery-dlt
-
-# 部署所有彩票类型
-docker-compose up -d
-```
-
-### 容器管理
-
-```bash
-# 查看状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f lottery-ssq
-
-# 重启容器
-docker-compose restart lottery-ssq
-
-# 停止容器
-docker-compose stop
-
-# 进入容器
-docker-compose exec lottery-ssq bash
-```
-
-## 📱 Telegram 通知
-
-系统会自动发送以下通知：
-
-- 🎰 **最新开奖结果** - 期号、日期、号码
-- 🔮 **下期预测** - 3-5组预测组合
-- 📈 **统计信息** - 高频号码分析
-- ❌ **错误通知** - 任务失败提醒
-
-### 配置步骤
-
-1. 创建机器人：在 Telegram 搜索 `@BotFather`
-2. 获取 Token：发送 `/newbot` 并按提示操作
-3. 获取 Chat ID：搜索 `@userinfobot` 并发送消息
-4. 配置到 `.env` 文件
-
-详细步骤：[Telegram 配置指南](docs/guides/TELEGRAM_SETUP.md)
-
-## ⚙️ 配置说明
-
-### 必需配置
-
-```bash
-# 数据库
-MYSQL_HOST=your_host
-MYSQL_USER=your_user
-MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=your_database
-
-# Telegram
-TELEGRAM_BOT_TOKEN=123456789:ABC...
-TELEGRAM_CHAT_ID=123456789
-```
-
-### 可选配置
-
-```bash
-# 定时任务时间（小时，24小时制）
-SSQ_CRON_HOUR=22  # 双色球 22:00
-DLT_CRON_HOUR=22  # 大乐透 22:00
-KS3_CRON_HOUR=22  # 快开3 22:00
-
-# 爬虫配置
-SPIDER_MIN_DELAY=0.5  # 最小请求间隔（秒）
-SPIDER_MAX_DELAY=2.0  # 最大请求间隔（秒）
-
-# 数据库性能
-DB_BATCH_SIZE=100  # 批量插入大小
-```
-
-## 📊 项目结构
+## 🏗️ 架构设计
 
 ```
-lottery-prediction/
-├── core/              # 核心框架（数据库、爬虫、预测、Telegram）
-├── lotteries/         # 彩票模块
-│   ├── ssq/          # 双色球 ✅
-│   └── dlt/          # 大乐透 🚧
-├── cli/               # 命令行工具
-├── scripts/           # 初始化和定时任务脚本
-├── deployment/        # Docker 部署配置
-│   ├── docker/
-│   ├── docker-compose.yml
-│   └── deploy.sh
-├── docs/              # 完整文档
-│   ├── deployment/   # 部署指南
-│   └── guides/       # 使用教程
-├── logs/              # 日志文件
-└── data/              # 数据文件
+┌─────────────────────────────────────────┐
+│          数据源（自动切换）              │
+│  ┌──────────────┐  ┌──────────────┐    │
+│  │  中彩网 API  │  │  500.com     │    │
+│  └──────────────┘  └──────────────┘    │
+└─────────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────┐
+│              爬虫模块                    │
+│  • 双数据源支持                          │
+│  • 自动切换                              │
+│  • 错误重试                              │
+└─────────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────┐
+│            数据存储                      │
+│  • Cloudflare D1 (Workers 版本)         │
+│  • MySQL/SQLite (Python 版本)           │
+└─────────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────┐
+│            预测算法                      │
+│  • 频率分析                              │
+│  • 遗漏分析                              │
+│  • 冷热分析                              │
+└─────────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────┐
+│          Telegram 通知                   │
+│  • 开奖结果                              │
+│  • 预测推荐                              │
+│  • 统计信息                              │
+└─────────────────────────────────────────┘
 ```
 
-## 🔧 常用命令
+## 📁 项目结构
 
-### 本地开发
-
-```bash
-# 安装依赖
-pip install -r requirements.txt
-
-# 配置环境
-cp .env.example .env
-
-# 运行命令
-python lottery.py fetch ssq --mode full
-python lottery.py predict ssq
+```
+gitmen-lottery/
+├── cloudflare-worker/      # Cloudflare Workers 版本
+│   ├── src/               # 源代码
+│   ├── docs/              # 文档
+│   └── scripts/           # 脚本
+├── lotteries/             # Python 版本
+│   └── ssq/              # 双色球模块
+├── core/                  # 核心模块
+├── docs/                  # 项目文档
+├── scripts/               # 工具脚本
+└── tests/                 # 测试文件
 ```
 
-### Docker 部署
+详细说明：[PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)
 
-```bash
-# 进入部署目录
-cd deployment
+## 🔧 核心改进
 
-# 部署
-./deploy.sh
+### 2025-11-17 重大更新
 
-# 查看日志
-docker-compose logs -f
+1. **双数据源支持**
+   - 添加 500.com 作为备用数据源
+   - 主源失败自动切换到备用源
+   - 提高数据获取成功率
 
-# 手动执行任务
-docker-compose exec lottery-ssq python scripts/daily_task.py
-```
+2. **全量爬取修复**
+   - 移除 1000 条限制
+   - 支持获取所有历史数据（4000+ 期）
+   - 自动去重，可重复执行
 
-## 🛡️ 安全特性
+3. **增量更新优化**
+   - 从数据库最新期号往后爬
+   - 避免漏掉中间的数据
+   - 智能检测，自动补全
 
-- ✅ 多 User-Agent 轮换
-- ✅ 随机请求间隔（0.5-2秒）
-- ✅ 429 限流自动处理
-- ✅ SSL/TLS 数据库连接
-- ✅ 环境变量隔离
-- ✅ 容器网络隔离
+4. **接口分离**
+   - `/init` 专注批量导入
+   - `/run` 专注增量更新
+   - 逻辑清晰，互不干扰
 
-## 📈 性能指标
+详细说明：[docs/fixes/](./docs/fixes/)
 
-- **内存使用**: ~200MB/容器
-- **CPU 使用**: <5%（空闲时）
-- **初始化时间**: ~15分钟（全量数据）
-- **每日任务**: ~30秒
-- **预测速度**: ~2秒
+## 📚 文档
 
-## ⚠️ 使用须知
+### 快速开始
+- [Cloudflare Worker 快速开始](./cloudflare-worker/docs/快速开始.md)
+- [Python 版本使用指南](./docs/USAGE.md)
 
-### 技术注意事项
+### 架构设计
+- [系统架构](./docs/ARCHITECTURE.md)
+- [项目设计](./docs/PROJECT_DESIGN.md)
+- [接口设计](./cloudflare-worker/docs/接口设计说明.md)
 
-1. **数据准确性** - 爬虫数据仅供参考，请以官方数据为准
-2. **网站规则** - 爬虫已优化防封禁，但仍需遵守目标网站的使用规则
-3. **数据备份** - 建议定期备份数据库，避免数据丢失
-4. **资源监控** - 注意监控服务器资源使用情况
+### 修复文档
+- [数据源修复](./docs/fixes/数据源修复总结.md)
+- [全量爬取修复](./docs/fixes/全量爬取修复总结.md)
+- [增量更新修复](./cloudflare-worker/docs/增量更新逻辑修复.md)
 
-### 法律合规
+### 部署文档
+- [Cloudflare Worker 部署](./cloudflare-worker/README.md)
+- [Docker 部署](./deployment/README.md)
 
-1. **遵守法律** - 严格遵守所在地区关于彩票和数据爬取的法律法规
-2. **个人使用** - 本项目仅限个人学习研究使用
-3. **禁止传播** - 不得将预测结果用于商业传播或销售
-4. **风险提示** - 使用者需自行承担所有使用风险
+## 🎯 使用场景
 
-### 道德准则
+### 场景 1：个人使用
 
-1. **理性购彩** - 彩票应作为娱乐，不应作为投资或赚钱手段
-2. **量力而行** - 购彩金额应在个人承受范围内
-3. **拒绝沉迷** - 如发现沉迷倾向，请立即停止使用
-4. **保护他人** - 不向未成年人或易受影响人群推荐使用
+使用 Cloudflare Workers 版本：
+- 完全免费
+- 无需服务器
+- 自动运行
+
+### 场景 2：团队使用
+
+使用 Python 版本：
+- 部署在自己的服务器
+- 数据完全掌控
+- 易于定制
+
+### 场景 3：数据分析
+
+使用 Python 版本：
+- 导出数据
+- 自定义分析
+- 集成到其他系统
+
+## ⚠️ 免责声明
+
+本项目仅供学习和研究使用，严禁用于任何商业或非法用途。
+
+- 所有预测结果基于历史数据统计，不代表未来结果
+- 不保证任何中奖概率
+- 请理性对待彩票，切勿沉迷
+- 使用本项目产生的任何后果由使用者自行承担
 
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
 
-### 如何贡献
-
-1. Fork 本项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
-**贡献者将会在这里展示！** 🎉
-
 ## 📄 许可证
 
 MIT License
 
-**使用本项目即表示您已完全理解并同意上述免责声明和使用须知。**
+## 🌟 Star History
 
-## 📞 支持
-
-- 📖 [完整文档](docs/INDEX.md)
-- 🐛 [问题反馈](https://github.com/88899/gitmen-lottery/issues)
-- 💬 [讨论区](https://github.com/88899/gitmen-lottery/discussions)
-- ⭐ [给个 Star](https://github.com/88899/gitmen-lottery)
+如果觉得有用，请给项目一个 Star ⭐
 
 ---
 
-<div align="center">
-
-## ⭐ Star 历史
-
-[![Star History Chart](https://api.star-history.com/svg?repos=88899/gitmen-lottery&type=Date)](https://star-history.com/#88899/gitmen-lottery&Date)
-
-### 🌟 如果这个项目帮助到了你，请不要吝啬你的 Star！
-
-**你的支持是我最大的动力！** 💪
-
-[![GitHub stars](https://img.shields.io/github/stars/88899/gitmen-lottery?style=for-the-badge&logo=github)](https://github.com/88899/gitmen-lottery/stargazers)
-
----
-
-**版本**: 2.2.4  
-**更新日期**: 2025-11-15  
-**状态**: 🟢 生产就绪  
-**重要**: ⚠️ 使用前请阅读 [免责声明](DISCLAIMER.md)
-
----
-
-Made with ❤️ by [88899](https://github.com/88899)
-
-**如果觉得不错，请点击右上角 ⭐ Star 支持一下！**
-
-</div>
+**最后更新**：2025-11-17  
+**版本**：2.0.0
