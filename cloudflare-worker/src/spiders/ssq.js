@@ -310,31 +310,38 @@ export class SSQSpider {
       const startIndex = allIssues.indexOf(startIssue);
       
       if (startIndex === -1) {
-        // 如果起始期号不在列表中，说明已经超出 API 返回的范围
-        // 这种情况下，取列表中最旧的期号往前的数据
-        console.log(`起始期号 ${startIssue} 不在 API 返回的列表中，可能已经爬取完成或期号不存在`);
+        // 如果起始期号不在列表中
+        console.log(`起始期号 ${startIssue} 不在 API 返回的列表中`);
         
-        // 尝试从最旧的期号继续
         const oldestInList = allIssues[allIssues.length - 1];
         console.log(`API 返回的最旧期号: ${oldestInList}`);
         
-        // 比较期号大小
-        if (parseInt(startIssue) < parseInt(oldestInList)) {
-          console.log(`数据库最旧期号 ${startIssue} 早于 API 最旧期号 ${oldestInList}，可能已爬取完成`);
+        // 比较期号：如果数据库最旧期号比 API 最旧期号还要旧，说明已经爬完了
+        if (parseInt(startIssue) <= parseInt(oldestInList)) {
+          console.log(`数据库最旧期号 ${startIssue} <= API 最旧期号 ${oldestInList}，可能已爬取完成`);
           return [];
         }
         
-        // 否则使用 API 返回的所有期号
+        // 否则，数据库最旧期号比 API 最旧期号新，说明中间有数据缺失
+        // 使用 API 返回的所有期号（这些都是比数据库更旧的数据）
+        console.log(`数据库最旧期号 ${startIssue} > API 最旧期号 ${oldestInList}，使用 API 返回的所有期号`);
         issues = allIssues.slice(0, maxCount || allIssues.length);
       } else {
         // 找到了起始期号，取它后面的期号（更早的数据）
         const remainingIssues = allIssues.slice(startIndex + 1);
         console.log(`从期号 ${startIssue} 往前，还有 ${remainingIssues.length} 个期号可爬取`);
         
+        if (remainingIssues.length === 0) {
+          console.log(`没有更早的数据了，可能已爬取完成`);
+          return [];
+        }
+        
         issues = remainingIssues.slice(0, maxCount || remainingIssues.length);
       }
       
-      console.log(`筛选后得到 ${issues.length} 个期号，范围: ${issues[issues.length - 1]} - ${issues[0]}`);
+      if (issues.length > 0) {
+        console.log(`筛选后得到 ${issues.length} 个期号，范围: ${issues[issues.length - 1]} - ${issues[0]}`);
+      }
     } else {
       // 如果没有指定起始期号，取最新的 maxCount 个期号
       issues = allIssues.slice(0, maxCount || allIssues.length);
@@ -522,70 +529,100 @@ export class SSQSpider {
   }
 
   /**
-   * 按日期范围获取数据
+   * 按日期范围获取数据（支持分页，获取所有数据）
    */
   async fetchByDateRange(startDate, endDate) {
     try {
-      await this.randomDelay();
+      const allResults = [];
+      let pageNum = 1;
+      const pageSize = 100;
       
-      const params = new URLSearchParams({
-        transactionType: '10001001',
-        lotteryId: '1',
-        startDate: startDate,
-        endDate: endDate,
-        pageNum: '1',
-        pageSize: '100',
-        type: '2',
-        tt: Date.now().toString()
-      });
-
-      const response = await fetch(`${this.apiUrl}?${params}`, {
-        headers: this.headers
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
+      console.log(`开始按日期范围查询: ${startDate} 至 ${endDate}`);
       
-      if (data.resCode !== '000000') {
-        return [];
-      }
+      while (true) {
+        await this.randomDelay();
+        
+        const params = new URLSearchParams({
+          transactionType: '10001001',
+          lotteryId: '1',
+          startDate: startDate,
+          endDate: endDate,
+          pageNum: pageNum.toString(),
+          pageSize: pageSize.toString(),
+          type: '2',
+          tt: Date.now().toString()
+        });
 
-      const records = data.pageList || [];
-      const results = [];
+        const response = await fetch(`${this.apiUrl}?${params}`, {
+          headers: this.headers
+        });
 
-      for (const record of records) {
-        try {
-          const redStr = record.frontWinningNum || record.seqFrontWinningNum || '';
-          const blueStr = record.backWinningNum || record.seqBackWinningNum || '';
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
 
-          if (!redStr || !blueStr) continue;
+        const data = await response.json();
+        
+        if (data.resCode !== '000000') {
+          console.log(`API 返回错误: ${data.resCode}`);
+          break;
+        }
 
-          const redBalls = redStr.match(/\d+/g).map(n => n.padStart(2, '0'));
-          const blueBall = blueStr.match(/\d+/g)[0].padStart(2, '0');
+        const records = data.pageList || [];
+        
+        if (records.length === 0) {
+          console.log(`第 ${pageNum} 页无数据，查询完成`);
+          break;
+        }
+        
+        console.log(`第 ${pageNum} 页: ${records.length} 条数据`);
 
-          results.push({
-            lottery_no: record.issue,
-            draw_date: (record.openTime || '').substring(0, 10),
-            red1: redBalls[0],
-            red2: redBalls[1],
-            red3: redBalls[2],
-            red4: redBalls[3],
-            red5: redBalls[4],
-            red6: redBalls[5],
-            blue: blueBall,
-            red_balls: redBalls,
-            blue_ball: blueBall,
-            sorted_code: redBalls.sort().join(',') + '-' + blueBall
-          });
-        } catch (e) {
-          console.error('解析记录失败:', e);
+        for (const record of records) {
+          try {
+            const redStr = record.frontWinningNum || record.seqFrontWinningNum || '';
+            const blueStr = record.backWinningNum || record.seqBackWinningNum || '';
+
+            if (!redStr || !blueStr) continue;
+
+            const redBalls = redStr.match(/\d+/g).map(n => n.padStart(2, '0'));
+            const blueBall = blueStr.match(/\d+/g)[0].padStart(2, '0');
+
+            allResults.push({
+              lottery_no: record.issue,
+              draw_date: (record.openTime || '').substring(0, 10),
+              red1: redBalls[0],
+              red2: redBalls[1],
+              red3: redBalls[2],
+              red4: redBalls[3],
+              red5: redBalls[4],
+              red6: redBalls[5],
+              blue: blueBall,
+              red_balls: redBalls,
+              blue_ball: blueBall,
+              sorted_code: redBalls.sort().join(',') + '-' + blueBall
+            });
+          } catch (e) {
+            console.error('解析记录失败:', e);
+          }
+        }
+        
+        // 如果返回的数据少于 pageSize，说明已经是最后一页
+        if (records.length < pageSize) {
+          console.log(`已获取所有数据，共 ${allResults.length} 条`);
+          break;
+        }
+        
+        pageNum++;
+        
+        // 安全限制：最多查询 10 页（避免无限循环）
+        if (pageNum > 10) {
+          console.log(`已查询 10 页，停止查询`);
+          break;
         }
       }
 
-      return results;
+      console.log(`日期范围查询完成: ${startDate} 至 ${endDate}，共 ${allResults.length} 条数据`);
+      return allResults;
     } catch (error) {
       console.error('按日期范围获取数据失败:', error);
       return [];

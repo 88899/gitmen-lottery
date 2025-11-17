@@ -218,31 +218,41 @@ export default {
         let allData = [];
         
         if (oldest) {
-          // 如果数据库有数据，从最旧的日期往前推一个月
+          // 如果数据库有数据，从最旧的日期往前推
           const oldestDate = new Date(oldest.draw_date);
           
-          // 计算日期范围：往前推 3 个月（确保能获取到足够的数据）
+          // 结束日期：最旧记录的前一天
           const endDate = new Date(oldestDate);
-          endDate.setDate(endDate.getDate() - 1); // 往前一天
+          endDate.setDate(endDate.getDate() - 1);
           
+          // 开始日期：往前推 6 个月（双色球每周3次，6个月约78期）
           const startDate = new Date(endDate);
-          startDate.setMonth(startDate.getMonth() - 3); // 往前 3 个月
+          startDate.setMonth(startDate.getMonth() - 6);
           
-          // 格式化日期为 YYYY-MM-DD
+          // 格式化日期
           const startDateStr = startDate.toISOString().split('T')[0];
           const endDateStr = endDate.toISOString().split('T')[0];
           
           console.log(`数据库最旧记录: ${oldest.lottery_no} (${oldest.draw_date})`);
-          console.log(`本次爬取日期范围: ${startDateStr} - ${endDateStr}`);
+          console.log(`查询日期范围: ${startDateStr} 至 ${endDateStr}`);
           
-          // 按日期范围爬取
+          // 按日期范围查询（查到多少就返回多少）
           allData = await spider.fetchByDateRange(startDateStr, endDateStr);
-          console.log(`爬取到 ${allData.length} 条数据`);
+          console.log(`查询到 ${allData.length} 条数据`);
         } else {
-          // 如果数据库为空，从最新开始爬取最近 100 期
-          console.log(`数据库为空，从最新数据开始爬取 100 期...`);
-          allData = await spider.fetchAll(100);
-          console.log(`爬取到 ${allData.length} 条数据`);
+          // 如果数据库为空，获取最近 6 个月的数据
+          const endDate = new Date();
+          const startDate = new Date();
+          startDate.setMonth(startDate.getMonth() - 6);
+          
+          const startDateStr = startDate.toISOString().split('T')[0];
+          const endDateStr = endDate.toISOString().split('T')[0];
+          
+          console.log(`数据库为空，查询最近 6 个月数据`);
+          console.log(`查询日期范围: ${startDateStr} 至 ${endDateStr}`);
+          
+          allData = await spider.fetchByDateRange(startDateStr, endDateStr);
+          console.log(`查询到 ${allData.length} 条数据`);
         }
         
         if (allData.length === 0) {
