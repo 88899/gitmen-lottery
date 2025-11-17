@@ -625,7 +625,7 @@ export class SSQSpider {
       return allResults;
     } catch (error) {
       console.error('按日期范围获取数据失败:', error);
-      return [];
+      throw error; // 抛出错误，让外层可以捕获并切换到备用数据源
     }
   }
 }
