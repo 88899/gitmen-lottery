@@ -56,10 +56,47 @@ class SSQSpider:
         'Accept-Language': 'zh-CN,zh;q=0.9',
     }
 
+    # 备用数据源：500彩票网
+    BACKUP_500_URL = "https://datachart.500.com/ssq/history/newinc/history.php"
+
     def __init__(self, timeout: int = 10, retry_times: int = 3):
         self.timeout = timeout
         self.retry_times = retry_times
         self.session = requests.Session()
+
+    def fetch_latest(self, count: int = 1) -> List[Dict]:
+        """获取最新开奖数据（支持自动切换数据源）
+        
+        优先使用主数据源（中彩网），失败时自动切换到备用数据源（500.com）
+        
+        Args:
+            count: 要获取的期数（默认1期）
+            
+        Returns:
+            中奖数据列表
+        """
+        # 先尝试主数据源（中彩网 API）
+        try:
+            logger.info("尝试从主数据源（中彩网）获取最新数据...")
+            api_data = self.fetch_api_recent(max_count=count)
+            if api_data and len(api_data) > 0:
+                logger.info(f"主数据源成功获取 {len(api_data)} 条数据")
+                return api_data[:count]
+        except Exception as e:
+            logger.warning(f"主数据源失败: {e}")
+        
+        # 主数据源失败，尝试备用数据源（500.com）
+        try:
+            logger.info("尝试从备用数据源（500.com）获取最新数据...")
+            backup_data = self.fetch_latest_from_500com(count=count)
+            if backup_data and len(backup_data) > 0:
+                logger.info(f"备用数据源成功获取 {len(backup_data)} 条数据")
+                return backup_data
+        except Exception as backup_error:
+            logger.error(f"备用数据源也失败: {backup_error}")
+        
+        # 所有数据源都失败
+        raise Exception("所有数据源均失败，无法获取数据")
 
     def fetch_page(self, page: int = 1) -> str:
         """
@@ -305,31 +342,34 @@ class SSQSpider:
 
         return lottery_list
 
-    def crawl_all(self, max_pages: int = None, use_api_first: bool = True) -> List[Dict]:
+    def crawl_all(self, max_pages: int = None, use_api_first: bool = False) -> List[Dict]:
         """
         爬取所有历史数据（分页模式，支持全量数据）
+        支持自动切换数据源：主源（中彩网）失败时自动切换到备用源（500.com）
 
         Args:
-            max_pages: 最大页数，None表示爬取所有页
-            use_api_first: 是否先尝试 API（仅能获取最近1000期），失败则分页爬取
+            max_pages: 最大页数，None表示爬取所有页（真正的全量）
+            use_api_first: 是否先尝试 API 快速获取（默认False，因为API只能获取1000期）
+                          如果设为True，会先尝试API获取1000期，然后继续分页爬取剩余数据
 
         Returns:
             所有中奖号码列表
         """
         all_data = []
 
-        # 可选：先尝试通过 API 获取最近数据（快速方式，但仅能获取1000期）
+        # 可选：先尝试通过 API 快速获取最近1000期（作为起点，然后继续分页爬取更早的数据）
+        # 注意：这里不会直接返回，而是作为初始数据，然后继续分页爬取
         if use_api_first:
             try:
-                logger.info("尝试通过官方 API 获取最近数据...")
+                logger.info("尝试通过主数据源（中彩网 API）快速获取最近1000期...")
                 api_data = self.fetch_api_recent(max_count=1000)
-                if api_data and len(api_data) > 100:
-                    logger.info(f"通过 API 获取到 {len(api_data)} 条最近数据")
-                    # 如果用户只要最近数据，可直接返回；否则继续分页爬取完整数据
-                    if not max_pages or max_pages == 0:
-                        return api_data
+                if api_data and len(api_data) > 0:
+                    logger.info(f"通过 API 快速获取到 {len(api_data)} 条最近数据")
+                    all_data.extend(api_data)
+                    logger.info("继续分页爬取更早的历史数据...")
             except Exception as e:
-                logger.debug(f"通过 API 获取数据失败: {e}，将改用分页爬取")
+                logger.warning(f"API 快速获取失败: {e}，将直接使用分页爬取")
+                # API 失败不影响后续的分页爬取
 
         # 分页爬取所有历史数据
         logger.info("开始分页爬取全量历史数据...")
@@ -594,8 +634,94 @@ class SSQSpider:
 
         return all_results
 
+    def fetch_latest_from_500com(self, count: int = 30) -> List[Dict]:
+        """从 500.com 获取最新数据（备用数据源）
+        
+        注意：500.com 不带参数时返回最近30期数据
+        
+        Args:
+            count: 期望获取的数量（实际最多30期）
+            
+        Returns:
+            中奖数据列表
+        """
+        all_results = []
+        # 500.com 不带参数返回最近30期
+        url = self.BACKUP_500_URL
+        
+        logger.info(f"从 500.com 获取最新数据（最多30期）...")
+        
+        try:
+            response = self.session.get(url, headers=self.HEADERS, timeout=self.timeout)
+            response.encoding = 'utf-8'
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, 'lxml')
+            tbody = soup.find('tbody', {'id': 'tdata'})
+
+            if not tbody:
+                logger.warning("未找到表格数据")
+                return []
+
+            rows = tbody.find_all('tr')
+            logger.info(f"找到 {len(rows)} 行数据")
+
+            for row in rows:
+                try:
+                    tds = row.find_all('td')
+                    if len(tds) < 10:
+                        continue
+
+                    # 解析表格列
+                    # 期号 | 红球1-6 | 蓝球 | 快乐星期天 | 奖池 | 一等奖注 | 一等奖金 | 二等奖注 | 二等奖金 | 投注额 | 开奖日期
+                    lottery_no = tds[0].text.strip()
+                    
+                    # 补全期号：如果是5位数字，补全为7位（加上年份前缀20）
+                    if lottery_no and re.match(r'^\d{5}$', lottery_no):
+                        lottery_no = '20' + lottery_no
+
+                    # 红球（前6列）
+                    red_texts = [tds[i].text.strip() for i in range(1, 7)]
+                    red_balls = sorted([int(t) for t in red_texts if t.isdigit()])
+
+                    # 蓝球
+                    blue_text = tds[7].text.strip()
+                    blue_ball = int(blue_text) if blue_text.isdigit() else 0
+
+                    # 开奖日期（倒数第一列）
+                    draw_date_text = tds[-1].text.strip()
+                    # 尝试提取 YYYY-MM-DD 格式
+                    draw_date_match = re.search(r'\d{4}-\d{2}-\d{2}', draw_date_text)
+                    draw_date = draw_date_match.group() if draw_date_match else ''
+
+                    if (lottery_no and len(red_balls) == 6 and
+                        1 <= blue_ball <= 16 and draw_date):
+                        all_results.append({
+                            'lottery_no': lottery_no,
+                            'draw_date': draw_date,
+                            'red_balls': red_balls,
+                            'blue_ball': blue_ball,
+                            'created_at': datetime.now().isoformat()
+                        })
+
+                except (ValueError, IndexError, AttributeError) as e:
+                    logger.debug(f"解析行失败: {e}")
+                    continue
+
+            logger.info(f"从 500.com 获取 {len(all_results)} 条数据")
+            
+            # 限制返回数量
+            return all_results[:count] if count else all_results
+
+        except Exception as e:
+            logger.error(f"从 500.com 获取数据失败: {e}")
+            raise
+
     def fetch_500com_data(self, start_issue: str, end_issue: str) -> List[Dict]:
         """从 500.com 获取历史数据（备选源，支持大范围查询）
+        
+        注意：此方法已废弃，500.com 的期号范围查询不再可用
+        建议使用 fetch_latest_from_500com() 获取最近30期数据
 
         Args:
             start_issue: 开始期号
@@ -604,10 +730,13 @@ class SSQSpider:
         Returns:
             中奖数据列表
         """
+        logger.warning("fetch_500com_data 方法已废弃，500.com 的期号范围查询不再可用")
+        logger.info("建议使用 fetch_latest_from_500com() 获取最近30期数据")
+        
         all_results = []
         url = f'https://datachart.500.com/ssq/history/newinc/history.php?start={start_issue}&end={end_issue}'
 
-        logger.info(f"从 500.com 获取数据: {start_issue} - {end_issue}")
+        logger.info(f"尝试从 500.com 获取数据: {start_issue} - {end_issue}")
 
         try:
             response = self.session.get(url, headers=self.HEADERS, timeout=self.timeout)

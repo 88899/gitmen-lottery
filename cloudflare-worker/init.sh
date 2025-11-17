@@ -4,8 +4,8 @@
 # 用于首次运行时分批导入历史数据
 
 # 配置
-WORKER_URL="https://your-worker.workers.dev"
-API_KEY="your-api-key"
+WORKER_URL="https://lottery-prediction.githubmen.workers.dev"
+API_KEY="	6690_042:A644AEpYn_658"
 MAX_ITERATIONS=50  # 最多执行 50 次
 SLEEP_TIME=120     # 每次间隔 120 秒（2 分钟）
 

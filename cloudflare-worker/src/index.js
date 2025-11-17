@@ -259,8 +259,11 @@ export default {
         await db.init();
         
         // 爬取全量数据
+        // 注意：由于 Cloudflare Worker 有 CPU 时间限制，建议使用分批模式（/run 接口）
+        // 如果要一次性获取更多数据，可以通过 ?count=5000 参数指定
         const spider = new SSQSpider();
-        const maxCount = parseInt(url.searchParams.get('count') || '1000');
+        const countParam = url.searchParams.get('count');
+        const maxCount = countParam ? parseInt(countParam) : null; // null 表示尽可能多
         const allData = await spider.fetchAll(maxCount);
         
         // 批量插入
