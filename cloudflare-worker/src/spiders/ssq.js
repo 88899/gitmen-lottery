@@ -263,60 +263,82 @@ export class SSQSpider {
    * @param {string} startIssue - 起始期号（可选），如果指定则从该期号往前爬取
    */
   async fetchAllFromZhcw(maxCount = null, startIssue = null) {
-    const requestCount = maxCount || 10000; // 如果不限制，默认请求 10000 期（足够覆盖所有历史）
+    const requestCount = maxCount || 10000;
     console.log(`开始从中彩网获取全量数据${maxCount ? `，最多 ${maxCount} 期` : '（所有历史数据）'}${startIssue ? `，从期号 ${startIssue} 往前爬取` : ''}...`);
     
     let issues = [];
     
+    // 始终从 API 获取期号列表（最可靠的方式）
+    await this.randomDelay();
+    
+    // 获取期号列表（API 单次最多 1000）
+    const params = new URLSearchParams({
+      transactionType: '10001003',
+      lotteryId: '1',
+      count: '1000',  // 获取最多的期号
+      tt: Date.now().toString()
+    });
+
+    const response = await fetch(`${this.apiUrl}?${params}`, {
+      headers: this.headers
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      throw new Error('API 返回空响应');
+    }
+
+    const data = JSON.parse(text);
+    
+    if (data.resCode !== '000000') {
+      throw new Error(`API错误: ${data.resCode}`);
+    }
+
+    const allIssues = data.issue || [];
+    console.log(`从 API 获取到 ${allIssues.length} 个期号`);
+    
+    if (allIssues.length === 0) {
+      throw new Error('未获取到期号列表');
+    }
+    
     if (startIssue) {
-      // 如果指定了起始期号，生成期号列表（从 startIssue 往前 maxCount 期）
-      const startNum = parseInt(startIssue);
-      const count = maxCount || 100;
+      // 如果指定了起始期号，找到该期号在列表中的位置，然后取后面的期号
+      const startIndex = allIssues.indexOf(startIssue);
       
-      console.log(`生成期号列表：从 ${startIssue} 往前 ${count} 期...`);
-      
-      for (let i = 0; i < count; i++) {
-        const issueNum = startNum - i;
-        if (issueNum <= 0) break; // 期号不能为负数
+      if (startIndex === -1) {
+        // 如果起始期号不在列表中，说明已经超出 API 返回的范围
+        // 这种情况下，取列表中最旧的期号往前的数据
+        console.log(`起始期号 ${startIssue} 不在 API 返回的列表中，可能已经爬取完成或期号不存在`);
         
-        const issue = issueNum.toString().padStart(startIssue.length, '0');
-        issues.push(issue);
+        // 尝试从最旧的期号继续
+        const oldestInList = allIssues[allIssues.length - 1];
+        console.log(`API 返回的最旧期号: ${oldestInList}`);
+        
+        // 比较期号大小
+        if (parseInt(startIssue) < parseInt(oldestInList)) {
+          console.log(`数据库最旧期号 ${startIssue} 早于 API 最旧期号 ${oldestInList}，可能已爬取完成`);
+          return [];
+        }
+        
+        // 否则使用 API 返回的所有期号
+        issues = allIssues.slice(0, maxCount || allIssues.length);
+      } else {
+        // 找到了起始期号，取它后面的期号（更早的数据）
+        const remainingIssues = allIssues.slice(startIndex + 1);
+        console.log(`从期号 ${startIssue} 往前，还有 ${remainingIssues.length} 个期号可爬取`);
+        
+        issues = remainingIssues.slice(0, maxCount || remainingIssues.length);
       }
       
-      console.log(`生成了 ${issues.length} 个期号，范围: ${issues[issues.length - 1]} - ${issues[0]}`);
+      console.log(`筛选后得到 ${issues.length} 个期号，范围: ${issues[issues.length - 1]} - ${issues[0]}`);
     } else {
-      // 如果没有指定起始期号，从 API 获取最新的期号列表
-      await this.randomDelay();
-      
-      // 获取期号列表（API 单次最多 1000）
-      const params = new URLSearchParams({
-        transactionType: '10001003',
-        lotteryId: '1',
-        count: Math.min(requestCount, 1000).toString(),
-        tt: Date.now().toString()
-      });
-
-      const response = await fetch(`${this.apiUrl}?${params}`, {
-        headers: this.headers
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const text = await response.text();
-      if (!text || text.trim() === '') {
-        throw new Error('API 返回空响应');
-      }
-
-      const data = JSON.parse(text);
-      
-      if (data.resCode !== '000000') {
-        throw new Error(`API错误: ${data.resCode}`);
-      }
-
-      issues = data.issue || [];
-      console.log(`从 API 获取到 ${issues.length} 个期号`);
+      // 如果没有指定起始期号，取最新的 maxCount 个期号
+      issues = allIssues.slice(0, maxCount || allIssues.length);
+      console.log(`取最新的 ${issues.length} 个期号`);
     }
 
     if (issues.length === 0) {

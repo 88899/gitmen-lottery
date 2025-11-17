@@ -213,25 +213,37 @@ export default {
         
         const spider = new SSQSpider();
         
-        // 每次爬取 100 期（避免超时）
-        const batchSize = 100;
-        
-        // 获取数据库中最旧的期号
+        // 获取数据库中最旧的记录
         const oldest = await db.getOldest('ssq');
-        let startIssue = null;
+        let allData = [];
         
         if (oldest) {
-          // 如果数据库有数据，从最旧的期号往前爬
-          const oldestNum = parseInt(oldest.lottery_no);
-          startIssue = (oldestNum - 1).toString().padStart(oldest.lottery_no.length, '0');
-          console.log(`数据库最旧期号: ${oldest.lottery_no}，本次从 ${startIssue} 往前爬取 ${batchSize} 期...`);
+          // 如果数据库有数据，从最旧的日期往前推一个月
+          const oldestDate = new Date(oldest.draw_date);
+          
+          // 计算日期范围：往前推 3 个月（确保能获取到足够的数据）
+          const endDate = new Date(oldestDate);
+          endDate.setDate(endDate.getDate() - 1); // 往前一天
+          
+          const startDate = new Date(endDate);
+          startDate.setMonth(startDate.getMonth() - 3); // 往前 3 个月
+          
+          // 格式化日期为 YYYY-MM-DD
+          const startDateStr = startDate.toISOString().split('T')[0];
+          const endDateStr = endDate.toISOString().split('T')[0];
+          
+          console.log(`数据库最旧记录: ${oldest.lottery_no} (${oldest.draw_date})`);
+          console.log(`本次爬取日期范围: ${startDateStr} - ${endDateStr}`);
+          
+          // 按日期范围爬取
+          allData = await spider.fetchByDateRange(startDateStr, endDateStr);
+          console.log(`爬取到 ${allData.length} 条数据`);
         } else {
-          // 如果数据库为空，从最新开始爬
-          console.log(`数据库为空，从最新数据开始爬取 ${batchSize} 期...`);
+          // 如果数据库为空，从最新开始爬取最近 100 期
+          console.log(`数据库为空，从最新数据开始爬取 100 期...`);
+          allData = await spider.fetchAll(100);
+          console.log(`爬取到 ${allData.length} 条数据`);
         }
-        
-        const allData = await spider.fetchAll(batchSize, startIssue);
-        console.log(`爬取到 ${allData.length} 条数据`);
         
         if (allData.length === 0) {
           return new Response(
