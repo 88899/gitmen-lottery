@@ -383,22 +383,77 @@ export class SSQSpider {
   }
 
   /**
-   * 从 500.com 获取全量数据（备用）
-   * 注意：500.com 默认只返回最近30期，需要多次请求获取更多数据
+   * 从 500.com 获取最新期号
    */
-  async fetchAllFrom500(maxCount = 1000) {
-    console.log(`开始从 500.com 获取全量数据，最多 ${maxCount} 期...`);
+  async getLatestIssueFrom500() {
+    await this.randomDelay();
     
-    const allData = [];
+    const url = 'https://datachart.500.com/ssq/history/history.shtml';
     
-    // 500.com 不带参数返回最近30期
-    // 要获取更多数据，需要分批请求不同的期号范围
-    // 但由于 500.com 的 API 限制，我们只能获取最近30期
-    // 如果需要更多数据，建议使用主数据源
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': this.headers['User-Agent'],
+        'Referer': 'https://www.500.com/',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    
+    // 解析 HTML，获取第一条数据的期号
+    const data = this.parse500Html(html);
+    
+    if (!data || data.length === 0) {
+      throw new Error('无法获取最新期号');
+    }
+    
+    // 返回最新期号（7位格式，如 2025132）
+    const latestIssue = data[0].lottery_no;
+    console.log(`500.com 最新期号: ${latestIssue}`);
+    
+    return latestIssue;
+  }
+
+  /**
+   * 从 500.com 获取数据（备用）
+   * 支持按期号范围查询，每次获取 50 期
+   * @param {number} batchSize - 每批次获取的期数（默认 50）
+   * @param {string} startIssue - 起始期号（可选），格式如 "2025132"（7位）
+   */
+  async fetchAllFrom500(batchSize = 50, startIssue = null) {
+    console.log(`开始从 500.com 获取数据，每批 ${batchSize} 期${startIssue ? `，从期号 ${startIssue} 往前` : ''}...`);
     
     await this.randomDelay();
     
-    const url = this.backup500Url;
+    let endIssue500; // 5位格式
+    
+    if (startIssue) {
+      // 如果指定了起始期号（7位格式，如 2025132）
+      // 转换为 5 位格式（25132）
+      endIssue500 = startIssue.substring(2);
+    } else {
+      // 如果没有指定，获取最新期号
+      const latestIssue = await this.getLatestIssueFrom500();
+      endIssue500 = latestIssue.substring(2);
+    }
+    
+    // 解析期号
+    const endNum = parseInt(endIssue500.substring(2)); // 去掉年份前缀，得到期数
+    const yearPrefix = endIssue500.substring(0, 2); // 年份前缀（如 25）
+    
+    // 计算开始期号（往前推 batchSize 期）
+    let startNum = endNum - batchSize + 1;
+    if (startNum < 1) startNum = 1;
+    
+    const startIssue500 = yearPrefix + startNum.toString().padStart(3, '0');
+    
+    console.log(`查询期号范围: ${startIssue500} - ${endIssue500}`);
+    
+    const url = `${this.backup500Url}?start=${startIssue500}&end=${endIssue500}`;
     
     const response = await fetch(url, {
       headers: {
@@ -418,16 +473,13 @@ export class SSQSpider {
     const data = this.parse500Html(html);
     
     if (!data || data.length === 0) {
-      throw new Error('500.com 未返回数据');
+      console.log('500.com 未返回数据');
+      return [];
     }
     
-    allData.push(...data);
+    console.log(`从 500.com 获取到 ${data.length} 条数据`);
     
-    console.log(`从 500.com 获取到 ${allData.length} 条数据（最近30期）`);
-    console.log('⚠️  500.com 备用源只能获取最近30期，如需更多数据请使用主数据源');
-    
-    // 限制数量
-    return allData.slice(0, Math.min(maxCount, allData.length));
+    return data;
   }
 
   /**
@@ -529,15 +581,17 @@ export class SSQSpider {
   }
 
   /**
-   * 按日期范围获取数据（支持分页，获取所有数据）
+   * 从中彩网按日期范围获取数据（支持分页，获取所有数据）
+   * @param {string} startDate - 开始日期 YYYY-MM-DD
+   * @param {string} endDate - 结束日期 YYYY-MM-DD
    */
-  async fetchByDateRange(startDate, endDate) {
+  async fetchByDateRangeFromZhcw(startDate, endDate) {
     try {
       const allResults = [];
       let pageNum = 1;
-      const pageSize = 100;
+      const pageSize = 30; // 中彩网默认 30 条/页
       
-      console.log(`开始按日期范围查询: ${startDate} 至 ${endDate}`);
+      console.log(`开始从中彩网按日期范围查询: ${startDate} 至 ${endDate}`);
       
       while (true) {
         await this.randomDelay();
@@ -545,26 +599,42 @@ export class SSQSpider {
         const params = new URLSearchParams({
           transactionType: '10001001',
           lotteryId: '1',
+          issueCount: '0',
+          startIssue: '0',
+          endIssue: '0',
           startDate: startDate,
           endDate: endDate,
+          type: '2',
           pageNum: pageNum.toString(),
           pageSize: pageSize.toString(),
-          type: '2',
-          tt: Date.now().toString()
+          tt: Math.random().toString()
         });
 
         const response = await fetch(`${this.apiUrl}?${params}`, {
-          headers: this.headers
+          headers: {
+            'User-Agent': this.headers['User-Agent'],
+            'Referer': 'https://www.zhcw.com/',
+            'Accept': 'application/json, text/plain, */*'
+          }
         });
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
 
-        const data = await response.json();
+        const text = await response.text();
+        
+        // 处理 JSONP 格式（如果有 callback）
+        let jsonText = text;
+        if (text.includes('(') && text.includes(')')) {
+          // 去掉 callback 包装: callback({...}) -> {...}
+          jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
+        }
+        
+        const data = JSON.parse(jsonText);
         
         if (data.resCode !== '000000') {
-          console.log(`API 返回错误: ${data.resCode}`);
+          console.log(`中彩网 API 返回错误: ${data.resCode} - ${data.message || ''}`);
           break;
         }
 
@@ -599,7 +669,7 @@ export class SSQSpider {
               blue: blueBall,
               red_balls: redBalls,
               blue_ball: blueBall,
-              sorted_code: redBalls.sort().join(',') + '-' + blueBall
+              sorted_code: [...redBalls].sort().join(',') + '-' + blueBall
             });
           } catch (e) {
             console.error('解析记录失败:', e);
@@ -614,18 +684,18 @@ export class SSQSpider {
         
         pageNum++;
         
-        // 安全限制：最多查询 10 页（避免无限循环）
-        if (pageNum > 10) {
-          console.log(`已查询 10 页，停止查询`);
+        // 安全限制：最多查询 20 页（避免无限循环）
+        if (pageNum > 20) {
+          console.log(`已查询 20 页，停止查询`);
           break;
         }
       }
 
-      console.log(`日期范围查询完成: ${startDate} 至 ${endDate}，共 ${allResults.length} 条数据`);
+      console.log(`中彩网日期范围查询完成: ${startDate} 至 ${endDate}，共 ${allResults.length} 条数据`);
       return allResults;
     } catch (error) {
-      console.error('按日期范围获取数据失败:', error);
-      throw error; // 抛出错误，让外层可以捕获并切换到备用数据源
+      console.error('从中彩网按日期范围获取数据失败:', error);
+      throw error;
     }
   }
 }

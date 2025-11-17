@@ -217,58 +217,65 @@ export default {
         const oldest = await db.getOldest('ssq');
         let allData = [];
         
-        if (oldest) {
-          // 如果数据库有数据，从最旧的日期往前推
-          const oldestDate = new Date(oldest.draw_date);
-          
-          // 结束日期：最旧记录的前一天
-          const endDate = new Date(oldestDate);
-          endDate.setDate(endDate.getDate() - 1);
-          
-          // 开始日期：往前推 6 个月（双色球每周3次，6个月约78期）
-          const startDate = new Date(endDate);
-          startDate.setMonth(startDate.getMonth() - 6);
-          
-          // 格式化日期
-          const startDateStr = startDate.toISOString().split('T')[0];
-          const endDateStr = endDate.toISOString().split('T')[0];
-          
-          console.log(`数据库最旧记录: ${oldest.lottery_no} (${oldest.draw_date})`);
-          console.log(`查询日期范围: ${startDateStr} 至 ${endDateStr}`);
-          
-          // 按日期范围查询（查到多少就返回多少）
-          try {
-            allData = await spider.fetchByDateRange(startDateStr, endDateStr);
-            console.log(`从主数据源查询到 ${allData.length} 条数据`);
-          } catch (error) {
-            console.log(`主数据源失败: ${error.message}，尝试备用数据源...`);
-            // 主数据源失败，尝试备用数据源
-            try {
-              allData = await spider.fetchAllFrom500(100);
-              console.log(`从备用数据源获取到 ${allData.length} 条数据`);
-            } catch (backupError) {
-              console.log(`备用数据源也失败: ${backupError.message}`);
-              allData = [];
-            }
+        // 优先使用中彩网（按日期范围查询）
+        try {
+          if (oldest) {
+            // 如果数据库有数据，从最旧的日期往前推 3 个月
+            const oldestDate = new Date(oldest.draw_date);
+            
+            // 结束日期：最旧记录的前一天
+            const endDate = new Date(oldestDate);
+            endDate.setDate(endDate.getDate() - 1);
+            
+            // 开始日期：往前推 3 个月
+            const startDate = new Date(endDate);
+            startDate.setMonth(startDate.getMonth() - 3);
+            
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = endDate.toISOString().split('T')[0];
+            
+            console.log(`数据库最旧记录: ${oldest.lottery_no} (${oldest.draw_date})`);
+            console.log(`使用中彩网查询日期范围: ${startDateStr} 至 ${endDateStr}`);
+            
+            allData = await spider.fetchByDateRangeFromZhcw(startDateStr, endDateStr);
+            console.log(`从中彩网获取到 ${allData.length} 条数据`);
+          } else {
+            // 如果数据库为空，获取最近 3 个月的数据
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setMonth(startDate.getMonth() - 3);
+            
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = endDate.toISOString().split('T')[0];
+            
+            console.log(`数据库为空，使用中彩网查询最近 3 个月数据`);
+            console.log(`查询日期范围: ${startDateStr} 至 ${endDateStr}`);
+            
+            allData = await spider.fetchByDateRangeFromZhcw(startDateStr, endDateStr);
+            console.log(`从中彩网获取到 ${allData.length} 条数据`);
           }
-        } else {
-          // 如果数据库为空，获取最新数据
-          console.log(`数据库为空，获取最新数据...`);
+        } catch (zhcwError) {
+          // 中彩网失败，使用 500.com
+          console.log(`中彩网失败: ${zhcwError.message}`);
+          console.log(`切换到 500.com 数据源...`);
           
           try {
-            // 先尝试主数据源
-            allData = await spider.fetchAll(100);
-            console.log(`从主数据源获取到 ${allData.length} 条数据`);
-          } catch (error) {
-            console.log(`主数据源失败: ${error.message}，尝试备用数据源...`);
-            // 主数据源失败，尝试备用数据源（500.com）
-            try {
-              allData = await spider.fetchAllFrom500(30);
-              console.log(`从备用数据源获取到 ${allData.length} 条数据`);
-            } catch (backupError) {
-              console.log(`备用数据源也失败: ${backupError.message}`);
-              allData = [];
+            // 重新查询数据库最旧记录（可能在中彩网失败前已经插入了部分数据）
+            const currentOldest = await db.getOldest('ssq');
+            
+            if (currentOldest) {
+              console.log(`当前数据库最旧记录: ${currentOldest.lottery_no} (${currentOldest.draw_date})`);
+              console.log(`使用 500.com 从该期号往前爬取 50 期...`);
+              allData = await spider.fetchAllFrom500(50, currentOldest.lottery_no);
+            } else {
+              console.log(`数据库仍为空，使用 500.com 获取最新 50 期...`);
+              allData = await spider.fetchAllFrom500(50);
             }
+            
+            console.log(`从 500.com 获取到 ${allData.length} 条数据`);
+          } catch (com500Error) {
+            console.log(`500.com 也失败: ${com500Error.message}`);
+            allData = [];
           }
         }
         
