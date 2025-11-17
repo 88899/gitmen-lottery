@@ -30,6 +30,7 @@ async function getConfig(env) {
 
 /**
  * 执行每日任务（由 Cloudflare 触发器调用）
+ * 智能判断：首次运行爬取全量数据，后续运行爬取增量数据
  */
 async function runDailyTask(env) {
   console.log('每日任务开始执行:', new Date().toISOString());
@@ -38,55 +39,169 @@ async function runDailyTask(env) {
   const telegram = new TelegramBot(config.telegramBotToken, config.telegramChatId);
   
   try {
-    // 初始化
     const db = new Database(env.DB);
     const spider = new SSQSpider();
     const predictor = new SSQPredictor(db);
     
-    // 1. 爬取最新数据
-    console.log('开始爬取最新数据...');
-    const latestData = await spider.fetchLatest();
+    // 检查数据库中是否有数据
+    const dataCount = await db.getCount('ssq');
+    console.log(`数据库中现有数据: ${dataCount} 条`);
     
-    if (!latestData) {
-      console.log('未获取到最新数据');
-      return { success: false, message: '未获取到最新数据' };
+    // 首次运行：爬取全量数据（分批处理，避免超时）
+    if (dataCount === 0) {
+      console.log('检测到首次运行，开始爬取历史数据...');
+      await telegram.sendMessage(
+        '🚀 系统首次运行，开始初始化历史数据...\n\n' +
+        '⚠️ 由于数据量大，将分批爬取\n' +
+        '建议：多次手动触发 /run 直到数据完整'
+      );
+      
+      // 每次只爬取 100 期，避免超时
+      const batchSize = 100;
+      const allData = await spider.fetchAll(batchSize);
+      console.log(`本次爬取到 ${allData.length} 条历史数据`);
+      
+      if (allData.length === 0) {
+        return {
+          success: false,
+          message: '未获取到数据',
+          mode: 'full'
+        };
+      }
+      
+      const result = await db.batchInsert('ssq', allData);
+      console.log(`批量插入完成: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条`);
+      
+      await telegram.sendMessage(
+        `✅ 本批次数据导入完成\n\n` +
+        `新增: ${result.inserted} 条\n` +
+        `跳过: ${result.skipped} 条\n` +
+        `总计: ${allData.length} 条\n\n` +
+        `💡 提示：请继续手动触发 /run\n` +
+        `直到提示"数据已是最新"`
+      );
+      
+      return {
+        success: true,
+        message: '首次运行完成（分批模式）',
+        mode: 'full',
+        inserted: result.inserted,
+        skipped: result.skipped,
+        batch_size: batchSize
+      };
     }
     
-    console.log(`获取到最新数据: ${latestData.lottery_no}`);
+    // 后续运行：智能增量爬取
+    console.log('开始智能增量爬取...');
     
-    // 检查是否已存在
-    const exists = await db.checkExists('ssq', latestData.lottery_no);
+    // 获取数据库中最新的期号
+    const latestInDb = await db.getLatest('ssq');
+    const latestLotteryNo = latestInDb ? latestInDb.lottery_no : null;
+    console.log(`数据库最新期号: ${latestLotteryNo}`);
     
-    if (exists) {
-      console.log(`数据已存在，跳过: ${latestData.lottery_no}`);
-      return { success: true, message: '数据已存在', lottery_no: latestData.lottery_no };
+    // 爬取最新数据
+    const latestOnline = await spider.fetchLatest();
+    if (!latestOnline) {
+      console.log('未获取到线上最新数据');
+      return { success: false, message: '未获取到线上数据' };
     }
     
-    // 保存到数据库
-    await db.insert('ssq', latestData);
-    console.log(`新数据已保存: ${latestData.lottery_no}`);
+    console.log(`线上最新期号: ${latestOnline.lottery_no}`);
     
-    // 2. 预测下一期
-    console.log('开始预测下一期...');
-    const predictions = await predictor.predict(5);
+    // 如果线上最新期号与数据库一致，说明没有新数据
+    if (latestLotteryNo === latestOnline.lottery_no) {
+      console.log('数据已是最新，无需更新');
+      return { 
+        success: true, 
+        message: '数据已是最新', 
+        mode: 'incremental',
+        lottery_no: latestLotteryNo 
+      };
+    }
     
-    // 3. 获取统计信息
-    const frequency = await db.getFrequency('ssq');
-    const stats = {
-      top_red: frequency.red.slice(0, 5),
-      top_blue: frequency.blue.slice(0, 3)
-    };
+    // 有新数据，开始增量爬取
+    console.log('检测到新数据，开始增量爬取...');
+    const newDataList = [];
+    let currentIssue = latestOnline.lottery_no;
+    let consecutiveNotFound = 0;
+    const maxNotFound = 3; // 连续3次未找到新数据则停止
     
-    // 4. 发送 Telegram 通知
-    await telegram.sendDailyReport(latestData, predictions, stats);
+    // 从最新期号开始往前爬，直到遇到数据库中已有的数据
+    while (consecutiveNotFound < maxNotFound) {
+      // 检查当前期号是否已存在
+      const exists = await db.checkExists('ssq', currentIssue);
+      
+      if (exists) {
+        console.log(`期号 ${currentIssue} 已存在，停止爬取`);
+        break;
+      }
+      
+      // 获取当前期号的数据
+      const issueData = await spider.fetchIssueDetail(currentIssue);
+      
+      if (issueData) {
+        console.log(`获取到新数据: ${currentIssue}`);
+        newDataList.push(issueData);
+        consecutiveNotFound = 0;
+        
+        // 计算上一期期号（简单递减，实际可能需要更复杂的逻辑）
+        const issueNum = parseInt(currentIssue);
+        currentIssue = (issueNum - 1).toString().padStart(currentIssue.length, '0');
+      } else {
+        consecutiveNotFound++;
+        console.log(`期号 ${currentIssue} 未找到数据，连续未找到次数: ${consecutiveNotFound}`);
+        
+        // 尝试上一期
+        const issueNum = parseInt(currentIssue);
+        currentIssue = (issueNum - 1).toString().padStart(currentIssue.length, '0');
+      }
+      
+      // 安全限制：最多爬取 100 期
+      if (newDataList.length >= 100) {
+        console.log('已爬取 100 期，停止');
+        break;
+      }
+    }
     
-    console.log('每日任务完成');
-    return { 
-      success: true, 
-      message: '任务完成', 
-      lottery_no: latestData.lottery_no,
-      predictions_count: predictions.length
-    };
+    // 保存新数据
+    if (newDataList.length > 0) {
+      console.log(`准备保存 ${newDataList.length} 条新数据`);
+      
+      // 按期号排序（从旧到新）
+      newDataList.sort((a, b) => a.lottery_no.localeCompare(b.lottery_no));
+      
+      const result = await db.batchInsert('ssq', newDataList);
+      console.log(`保存完成: 新增 ${result.inserted} 条`);
+      
+      // 预测下一期
+      const predictions = await predictor.predict(5);
+      
+      // 获取统计信息
+      const frequency = await db.getFrequency('ssq');
+      const stats = {
+        top_red: frequency.red.slice(0, 5),
+        top_blue: frequency.blue.slice(0, 3)
+      };
+      
+      // 发送通知（使用最新一期的数据）
+      const latestNew = newDataList[newDataList.length - 1];
+      await telegram.sendDailyReport(latestNew, predictions, stats);
+      
+      return {
+        success: true,
+        message: '增量更新完成',
+        mode: 'incremental',
+        new_count: result.inserted,
+        latest_lottery_no: latestNew.lottery_no
+      };
+    } else {
+      console.log('没有新数据需要保存');
+      return {
+        success: true,
+        message: '没有新数据',
+        mode: 'incremental'
+      };
+    }
     
   } catch (error) {
     console.error('每日任务执行失败:', error);

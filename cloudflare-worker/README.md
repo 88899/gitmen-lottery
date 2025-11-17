@@ -115,13 +115,56 @@ CREATE INDEX IF NOT EXISTS idx_draw_date ON ssq_lottery(draw_date);
 CREATE INDEX IF NOT EXISTS idx_sorted_code ON ssq_lottery(sorted_code);
 ```
 
-#### 导入历史数据
+#### 自动初始化（分批模式）
+
+由于 Cloudflare Workers 有 CPU 时间限制，系统采用**分批初始化**策略：
+
+**步骤 1: 首次触发**
+```bash
+curl -X POST https://your-worker.workers.dev/run \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+系统会检测到数据库为空，爬取 100 期数据（约 1-2 分钟）。
+
+**步骤 2: 继续触发**
+
+收到 Telegram 通知后，继续执行相同命令：
+```bash
+curl -X POST https://your-worker.workers.dev/run \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+系统会继续爬取下一批 100 期数据。
+
+**步骤 3: 重复执行**
+
+重复执行上述命令，直到收到"数据已是最新"的通知。
+
+**预计次数**：
+- 4000 期数据 ÷ 100 期/批 = 约 40 次
+- 每次间隔 1-2 分钟
+- 总耗时约 1-2 小时
+
+**或使用脚本自动化**：
+```bash
+#!/bin/bash
+# 自动初始化脚本
+for i in {1..50}; do
+  echo "执行第 $i 次..."
+  curl -X POST https://your-worker.workers.dev/run \
+    -H "Authorization: Bearer YOUR_API_KEY"
+  sleep 120  # 等待 2 分钟
+done
+```
+
+#### 手动初始化（可选）
+
+也可以使用 `/init` 接口，但同样是分批模式：
 ```bash
 curl -X POST https://your-worker.workers.dev/init \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
-
-等待 5-10 分钟，完成后会收到 Telegram 通知。
 
 ### 7. 配置定时触发器
 
@@ -136,6 +179,63 @@ curl -X POST https://your-worker.workers.dev/init \
    - **Headers**：
      - `Authorization: Bearer YOUR_API_KEY`
      - `Content-Type: application/json`
+
+## 🔄 运行机制
+
+### 智能初始化
+
+系统会自动检测是否为首次运行：
+
+**首次运行（数据库为空）**：
+- ✅ 自动检测数据库为空
+- ✅ 每次爬取 100 期数据（避免超时）
+- ✅ 需要多次触发直到完成
+- ⏱️ 每次耗时约 1-2 分钟
+- 📊 总计约需 40 次（4000 期数据）
+
+**后续运行（有历史数据）**：
+- ✅ 智能增量爬取
+- ✅ 只爬取缺失的数据
+- ✅ 自动停止条件
+- ⏱️ 耗时约 30 秒
+
+### 增量爬取逻辑
+
+系统会智能处理各种情况：
+
+**情况 1: 正常情况（每天运行）**
+```
+数据库最新: 2025130
+线上最新: 2025131
+→ 爬取 2025131，保存 1 条新数据
+```
+
+**情况 2: 停止运行几天后**
+```
+数据库最新: 2025130
+线上最新: 2025135
+→ 爬取 2025131-2025135，保存 5 条新数据
+```
+
+**情况 3: 当天没有开奖**
+```
+数据库最新: 2025131
+线上最新: 2025131
+→ 数据已是最新，跳过
+```
+
+**情况 4: 期号不连续**
+```
+→ 连续 3 次未找到数据则停止
+→ 防止无限循环
+```
+
+### 安全机制
+
+- ✅ 最多爬取 100 期（防止异常）
+- ✅ 连续 3 次未找到数据则停止
+- ✅ 自动去重（数据库唯一约束）
+- ✅ 错误自动通知
 
 ## 📖 API 接口
 

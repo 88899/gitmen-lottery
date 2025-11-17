@@ -28,12 +28,37 @@ npx wrangler deploy
 ### 3. 初始化数据库
 
 ```bash
-# 在 D1 控制台执行 schema.sql
-
-# 导入历史数据
-curl -X POST https://your-worker.workers.dev/init \
-  -H "Authorization: Bearer YOUR_API_KEY"
+# 在 D1 控制台执行 schema.sql 创建表结构
 ```
+
+#### 方式 1: 使用自动化脚本（推荐）
+
+```bash
+# 编辑 init.sh，填入你的 Worker URL 和 API_KEY
+nano init.sh
+
+# 运行脚本
+./init.sh
+```
+
+脚本会自动执行多次，直到数据完整。
+
+#### 方式 2: 手动多次触发
+
+```bash
+# 执行多次，每次间隔 2 分钟
+curl -X POST https://your-worker.workers.dev/run \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# 等待 2 分钟后再次执行
+# 重复约 40 次，直到收到"数据已是最新"的通知
+```
+
+**说明**：
+- 由于 CPU 时间限制，每次只爬取 100 期
+- 4000 期数据需要约 40 次执行
+- 每次耗时约 1-2 分钟
+- 总耗时约 1-2 小时
 
 ### 4. 配置触发器
 
