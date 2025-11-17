@@ -430,20 +430,33 @@ export class SSQSpider {
     await this.randomDelay();
     
     let endIssue500; // 5位格式
+    let yearPrefix; // 年份前缀
+    let endNum; // 期数
     
     if (startIssue) {
       // 如果指定了起始期号（7位格式，如 2025132）
-      // 转换为 5 位格式（25132）
-      endIssue500 = startIssue.substring(2);
+      // 需要从该期号往前爬取，所以 end = startIssue - 1
+      yearPrefix = startIssue.substring(2, 4); // 2025132 -> 25
+      const issueNum = parseInt(startIssue.substring(4)); // 2025132 -> 132
+      
+      // 往前一期
+      endNum = issueNum - 1;
+      
+      if (endNum < 1) {
+        // 如果已经是第一期，无法再往前
+        console.log(`期号 ${startIssue} 已经是该年第一期，无法继续往前`);
+        return [];
+      }
+      
+      endIssue500 = yearPrefix + endNum.toString().padStart(3, '0');
+      console.log(`从数据库最旧期号 ${startIssue} 往前，查询到 ${yearPrefix}${endNum.toString().padStart(3, '0')}`);
     } else {
       // 如果没有指定，获取最新期号
       const latestIssue = await this.getLatestIssueFrom500();
       endIssue500 = latestIssue.substring(2);
+      yearPrefix = endIssue500.substring(0, 2);
+      endNum = parseInt(endIssue500.substring(2));
     }
-    
-    // 解析期号
-    const endNum = parseInt(endIssue500.substring(2)); // 去掉年份前缀，得到期数
-    const yearPrefix = endIssue500.substring(0, 2); // 年份前缀（如 25）
     
     // 计算开始期号（往前推 batchSize 期）
     let startNum = endNum - batchSize + 1;
@@ -451,7 +464,7 @@ export class SSQSpider {
     
     const startIssue500 = yearPrefix + startNum.toString().padStart(3, '0');
     
-    console.log(`查询期号范围: ${startIssue500} - ${endIssue500}`);
+    console.log(`500.com 查询期号范围: ${startIssue500} - ${endIssue500}`);
     
     const url = `${this.backup500Url}?start=${startIssue500}&end=${endIssue500}`;
     
