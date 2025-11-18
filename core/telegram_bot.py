@@ -24,6 +24,16 @@ class TelegramBot:
         self.bot_token = bot_token or os.getenv('TELEGRAM_BOT_TOKEN')
         self.chat_id = chat_id or os.getenv('TELEGRAM_CHAT_ID')
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
+        
+        # 代理配置（仅本地测试使用，生产环境不需要）
+        self.proxies = None
+        proxy_url = os.getenv('TELEGRAM_PROXY')
+        if proxy_url:
+            self.proxies = {
+                'http': proxy_url,
+                'https': proxy_url
+            }
+            logger.info(f"使用代理: {proxy_url}")
 
         if not self.bot_token or not self.chat_id:
             logger.warning("Telegram 配置未设置，通知功能将不可用")
@@ -51,7 +61,7 @@ class TelegramBot:
                 'parse_mode': parse_mode
             }
 
-            response = requests.post(url, json=data, timeout=10)
+            response = requests.post(url, json=data, timeout=10, proxies=self.proxies)
             response.raise_for_status()
 
             logger.info("Telegram 消息发送成功")
@@ -249,7 +259,7 @@ class TelegramBot:
         """
         try:
             url = f"{self.api_url}/getMe"
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=10, proxies=self.proxies)
             response.raise_for_status()
             
             data = response.json()

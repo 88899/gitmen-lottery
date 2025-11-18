@@ -76,6 +76,18 @@ class SSQSpider:
         except Exception as e:
             logger.error(f"获取数据失败: {e}")
             return []
+    
+    def fetch_500com_data(self, start_issue: str, end_issue: str) -> List[Dict]:
+        """按期号范围获取数据（兼容旧接口）
+        
+        Args:
+            start_issue: 开始期号（5位格式，如 '03001'）
+            end_issue: 结束期号（5位格式，如 '03200'）
+            
+        Returns:
+            中奖数据列表
+        """
+        return self.fetch_by_range(start_issue, end_issue)
 
     def _fetch_from_500com(self) -> List[Dict]:
         """从 500.com 获取数据（不带参数返回最近30期）"""

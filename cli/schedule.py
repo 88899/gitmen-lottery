@@ -74,7 +74,9 @@ def fetch_and_predict_single(lottery_type: str):
             logger.info("\n开始预测下一期号码...")
             from lotteries.ssq.predictor import SSQPredictor
             
-            predictor = SSQPredictor(db)
+            # 获取历史数据用于预测
+            history_data = db.get_latest_lotteries(limit=200)
+            predictor = SSQPredictor(history_data)
             predictions = predictor.predict(count=5)
             
             logger.info(f"预测结果（共 {len(predictions)} 组）:")
@@ -130,15 +132,16 @@ def fetch_and_predict_single(lottery_type: str):
                 back_str = ','.join([f"{int(b):02d}" for b in latest['back_balls']])
                 logger.info(f"号码: 前区 {front_str} | 后区 {back_str}")
             
-            db.close()
-            
             # 预测下一期
             logger.info("\n开始预测下一期号码...")
             from lotteries.dlt.predictor import DLTPredictor
             
-            db.connect()
-            predictor = DLTPredictor(db)
+            # 获取历史数据用于预测
+            history_data = db.get_latest_lotteries(limit=200)
+            predictor = DLTPredictor(history_data)
             predictions = predictor.predict(count=5)
+            
+            db.close()
             
             logger.info(f"预测结果（共 {len(predictions)} 组）:")
             for i, pred in enumerate(predictions, 1):
