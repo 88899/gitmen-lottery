@@ -7,6 +7,8 @@
 
 import { SSQSpider } from './spiders/ssq.js';
 import { SSQPredictor } from './predictors/ssq.js';
+import { DLTSpider } from './spiders/dlt.js';
+import { DLTPredictor } from './predictors/dlt.js';
 import { TelegramBot } from './utils/telegram.js';
 import { Database } from './utils/database.js';
 
@@ -33,99 +35,93 @@ async function getConfig(env) {
 }
 
 /**
- * 执行每日任务（由 Cloudflare 触发器调用）
- * 智能判断：首次运行爬取全量数据，后续运行爬取增量数据
+ * 获取彩票类型的爬虫和预测器
  */
-async function runDailyTask(env) {
-  console.log('每日任务开始执行:', new Date().toISOString());
+function getLotteryModules(type) {
+  const modules = {
+    ssq: {
+      name: '双色球',
+      spider: SSQSpider,
+      predictor: SSQPredictor,
+      startYear: 2003
+    },
+    dlt: {
+      name: '大乐透',
+      spider: DLTSpider,
+      predictor: DLTPredictor,
+      startYear: 2007
+    }
+  };
   
-  const config = await getConfig(env);
-  const telegram = new TelegramBot(config.telegramBotToken, config.telegramChatId);
+  if (!modules[type]) {
+    throw new Error(`不支持的彩票类型: ${type}。支持的类型: ${Object.keys(modules).join(', ')}`);
+  }
+  
+  return modules[type];
+}
+
+/**
+ * 从 URL 路径中提取彩票类型
+ * 支持 /action/type 格式，如果没有指定类型则默认为 ssq（兼容旧版本）
+ */
+function extractLotteryType(pathname) {
+  const parts = pathname.split('/').filter(p => p);
+  
+  // 如果路径有两部分，第二部分是彩票类型
+  if (parts.length >= 2) {
+    const type = parts[1];
+    if (type === 'ssq' || type === 'dlt') {
+      return type;
+    }
+  }
+  
+  // 默认返回 ssq（兼容旧版本）
+  return 'ssq';
+}
+
+/**
+ * 处理单个彩票类型的增量更新和预测
+ */
+async function processSingleLottery(type, env, config) {
+  const modules = getLotteryModules(type);
+  const db = new Database(env.DB);
+  const spider = new modules.spider();
+  
+  console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  console.log(`📊 处理 ${modules.name}`);
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   
   try {
-    const db = new Database(env.DB);
-    const spider = new SSQSpider();
     
-    // 解析默认策略配置
-    const defaultStrategies = config.defaultStrategies.split(',').map(s => s.trim());
-    const predictor = new SSQPredictor(db, { strategies: defaultStrategies });
-    
-    // /run 接口专注于增量更新
-    // 用途：每日定时任务，检查并获取最新数据
-    // 策略：从 500.com 获取最新一期，与数据库比较，如果不存在则入库
-    
-    console.log('开始增量更新模式...');
-    
-    // 获取数据库中最新的一期（按开奖日期排序）
-    const latestInDb = await db.getLatest('ssq');
+    // 获取数据库中最新的一期
+    const latestInDb = await db.getLatest(type);
     console.log(`数据库最新记录: ${latestInDb ? `${latestInDb.lottery_no} (${latestInDb.draw_date})` : '无数据'}`);
     
-    // 从 500.com 获取最新一期数据
-    console.log('从 500.com 获取最新一期数据...');
+    // 获取线上最新一期数据
+    console.log('获取线上最新数据...');
+    let latestOnline = await spider.fetchLatest();
     
-    let latestOnline = null;
-    
-    try {
-      const url = 'https://datachart.500.com/ssq/history/history.shtml';
-      
-      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      console.log(`📊 数据源: 500.com (增量爬取)`);
-      console.log(`🔗 URL: ${url}`);
-      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Referer': 'https://www.500.com/',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const html = await response.text();
-      
-      // 解析 HTML，获取最新一期数据
-      const dataList = spider.parse500Html(html);
-      
-      // 检查返回值
-      if (!Array.isArray(dataList) || dataList.length === 0) {
-        throw new Error('未解析到数据');
-      }
-      
-      // 取第一条（最新一期）
-      latestOnline = dataList[0];
-      console.log(`线上最新记录: ${latestOnline.lottery_no} (${latestOnline.draw_date})`);
-      
-    } catch (error) {
-      console.error('从 500.com 获取最新数据失败:', error.message);
-      
-      // 降级：使用中彩网
-      console.log('降级到中彩网获取最新数据...');
-      try {
-        latestOnline = await spider.fetchLatestFromZhcw();
-        console.log(`线上最新记录（中彩网）: ${latestOnline.lottery_no} (${latestOnline.draw_date})`);
-      } catch (zhcwError) {
-        console.error('中彩网也失败:', zhcwError.message);
-        return {
-          success: false,
-          message: '所有数据源均失败',
-          mode: 'incremental',
-          primary_error: error.message,
-          fallback_error: zhcwError.message
-        };
-      }
+    if (!latestOnline) {
+      console.log('⚠ 未获取到线上数据');
+      return {
+        type: type,
+        name: modules.name,
+        success: false,
+        message: '未获取到线上数据'
+      };
     }
+    
+    console.log(`线上最新记录: ${latestOnline.lottery_no} (${latestOnline.draw_date})`);
     
     // 比较数据库和线上的最新记录
     if (latestInDb && latestInDb.lottery_no === latestOnline.lottery_no) {
-      console.log('数据已是最新，无需更新');
+      console.log('✓ 数据已是最新，无需更新');
       return {
+        type: type,
+        name: modules.name,
         success: true,
         message: '数据已是最新',
-        mode: 'incremental',
+        hasNewData: false,
         lottery_no: latestInDb.lottery_no,
         draw_date: latestInDb.draw_date
       };
@@ -133,15 +129,16 @@ async function runDailyTask(env) {
     
     // 有新数据，检查是否已存在
     console.log('检测到新数据，检查是否需要入库...');
-    
-    const exists = await db.checkExists('ssq', latestOnline.lottery_no);
+    const exists = await db.checkExists(type, latestOnline.lottery_no);
     
     if (exists) {
-      console.log(`期号 ${latestOnline.lottery_no} 已存在数据库，无需更新`);
+      console.log(`✓ 期号 ${latestOnline.lottery_no} 已存在数据库`);
       return {
+        type: type,
+        name: modules.name,
         success: true,
         message: '数据已存在',
-        mode: 'incremental',
+        hasNewData: false,
         lottery_no: latestOnline.lottery_no,
         draw_date: latestOnline.draw_date
       };
@@ -149,31 +146,120 @@ async function runDailyTask(env) {
     
     // 新数据，入库
     console.log(`准备入库新数据: ${latestOnline.lottery_no} (${latestOnline.draw_date})`);
+    const result = await db.batchInsert(type, [latestOnline]);
+    console.log(`✓ 入库完成: 新增 ${result.inserted} 条`);
     
-    const result = await db.batchInsert('ssq', [latestOnline]);
-    console.log(`入库完成: 新增 ${result.inserted} 条`);
-    
-    // 预测下一期（使用配置的默认条数）
+    // 预测下一期
+    console.log('开始预测下一期...');
+    const defaultStrategies = config.defaultStrategies.split(',').map(s => s.trim());
+    const predictor = new modules.predictor(db, { strategies: defaultStrategies });
     const predictions = await predictor.predict(config.defaultPredictionCount);
+    console.log(`✓ 预测完成: ${predictions.length} 组`);
     
-    // 获取统计信息
-    const frequency = await db.getFrequency('ssq');
-    const stats = {
-      top_red: frequency.red.slice(0, 5),
-      top_blue: frequency.blue.slice(0, 3)
+    return {
+      type: type,
+      name: modules.name,
+      success: true,
+      message: '增量更新完成',
+      hasNewData: true,
+      new_count: result.inserted,
+      latest: latestOnline,
+      predictions: predictions
     };
     
-    // 发送通知（增量更新时发送）
-    console.log('发送 Telegram 通知（增量更新）');
-    await telegram.sendDailyReport(latestOnline, predictions, stats);
+  } catch (error) {
+    console.error(`${modules.name} 处理失败:`, error);
+    return {
+      type: type,
+      name: modules.name,
+      success: false,
+      message: error.message
+    };
+  }
+}
+
+/**
+ * 执行每日任务（由 Cloudflare 触发器调用）
+ * 同时处理双色球和大乐透
+ */
+async function runDailyTask(env) {
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🎰 每日任务开始执行');
+  console.log('时间:', new Date().toISOString());
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  
+  const config = await getConfig(env);
+  const telegram = new TelegramBot(config.telegramBotToken, config.telegramChatId);
+  
+  try {
+    // 处理双色球
+    const ssqResult = await processSingleLottery('ssq', env, config);
+    
+    // 处理大乐透
+    const dltResult = await processSingleLottery('dlt', env, config);
+    
+    // 构建综合消息
+    const results = [ssqResult, dltResult].filter(r => r.success);
+    
+    if (results.length > 0) {
+      let message = '🎰 <b>彩票预测系统 - 每日更新</b>\n\n';
+      
+      for (const result of results) {
+        message += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        message += `<b>${result.name}</b>\n\n`;
+        
+        if (result.hasNewData) {
+          const latest = result.latest;
+          message += `📅 最新开奖: ${latest.lottery_no} (${latest.draw_date})\n`;
+          
+          if (result.type === 'ssq') {
+            message += `🔴 号码: ${latest.red_balls} + ${latest.blue_ball}\n\n`;
+          } else {
+            const frontStr = latest.front_balls.map(b => String(b).padStart(2, '0')).join(',');
+            const backStr = latest.back_balls.map(b => String(b).padStart(2, '0')).join(',');
+            message += `🔴 号码: 前区 ${frontStr} | 后区 ${backStr}\n\n`;
+          }
+          
+          // 预测结果（只显示前3组）
+          message += `🔮 <b>预测下一期（${result.predictions.length} 组）</b>\n`;
+          for (let i = 0; i < Math.min(3, result.predictions.length); i++) {
+            const pred = result.predictions[i];
+            if (result.type === 'ssq') {
+              message += `  ${i + 1}. ${pred.red_balls} + ${pred.blue_ball}\n`;
+            } else {
+              const frontStr = pred.front_balls.map(b => String(b).padStart(2, '0')).join(',');
+              const backStr = pred.back_balls.map(b => String(b).padStart(2, '0')).join(',');
+              message += `  ${i + 1}. ${frontStr} | ${backStr}\n`;
+            }
+          }
+          
+          if (result.predictions.length > 3) {
+            message += `  ... 还有 ${result.predictions.length - 3} 组\n`;
+          }
+        } else {
+          message += `✅ 暂无新数据\n`;
+        }
+        
+        message += '\n';
+      }
+      
+      message += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      message += `⏰ 更新时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n`;
+      
+      // 发送 Telegram 通知
+      console.log('\n发送 Telegram 通知...');
+      await telegram.sendMessage(message);
+      console.log('✓ Telegram 通知已发送');
+    }
+    
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('✅ 每日任务执行完成');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
     return {
       success: true,
-      message: '增量更新完成',
-      mode: 'incremental',
-      new_count: result.inserted,
-      lottery_no: latestOnline.lottery_no,
-      draw_date: latestOnline.draw_date
+      message: '每日任务执行完成',
+      results: [ssqResult, dltResult]
     };
     
   } catch (error) {
@@ -186,7 +272,10 @@ async function runDailyTask(env) {
       console.error('发送错误通知失败:', e);
     }
     
-    throw error;
+    return {
+      success: false,
+      message: error.message
+    };
   }
 }
 
@@ -202,14 +291,26 @@ export default {
     if (url.pathname === '/') {
       return new Response(
         '🎰 彩票预测系统 - Cloudflare Workers 版本\n\n' +
+        '支持的彩票类型:\n' +
+        '  ssq - 双色球\n' +
+        '  dlt - 大乐透\n\n' +
         '可用接口:\n' +
-        '  POST /run - 手动执行每日任务\n' +
-        '  POST /init - 初始化数据库并导入历史数据\n' +
-        '  GET /latest - 查询最新开奖数据\n' +
-        '  GET /predict?count=5&strategies=frequency,balanced - 获取预测结果\n' +
-        '  GET /strategies - 查看可用预测策略\n' +
-        '  GET /stats - 查看统计信息\n' +
+        '  POST /run/{type} - 手动执行每日任务\n' +
+        '    示例: POST /run/ssq, POST /run/dlt\n\n' +
+        '  POST /init/{type} - 初始化数据库并导入历史数据\n' +
+        '    示例: POST /init/ssq, POST /init/dlt\n\n' +
+        '  GET /latest/{type} - 查询最新开奖数据\n' +
+        '    示例: GET /latest/ssq, GET /latest/dlt\n\n' +
+        '  GET /predict/{type}?count=5&strategies=frequency,balanced - 获取预测结果\n' +
+        '    示例: GET /predict/ssq?count=10&strategies=frequency,balanced\n' +
+        '          GET /predict/dlt?count=15&strategies=frequency,coldHot\n\n' +
+        '  GET /strategies/{type} - 查看可用预测策略\n' +
+        '    示例: GET /strategies/ssq, GET /strategies/dlt\n\n' +
+        '  GET /stats/{type} - 查看统计信息\n' +
+        '    示例: GET /stats/ssq, GET /stats/dlt\n\n' +
         '  GET /test - 测试 Telegram 连接\n\n' +
+        '兼容接口（默认双色球）:\n' +
+        '  POST /run, POST /init, GET /latest, GET /predict, GET /strategies, GET /stats\n\n' +
         '说明：定时任务通过 Cloudflare Dashboard 的触发器配置\n',
         {
           headers: { 'Content-Type': 'text/plain; charset=utf-8' }

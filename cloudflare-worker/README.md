@@ -1,618 +1,268 @@
-# 彩票预测系统 - Cloudflare Workers 版本
+# Cloudflare Worker 版本
 
-基于 Cloudflare Workers + D1 + KV 的双色球彩票预测系统，通过 GitHub 自动部署。
+## 概述
 
-## ✨ 特性
+彩票预测系统的 Cloudflare Worker 版本，支持双色球和大乐透。
 
-- 🚀 无服务器部署 - 基于 Cloudflare Workers
-- 📊 D1 数据库 - SQLite 存储历史数据
-- 🔐 KV 配置管理 - 安全存储敏感信息
-- 📱 Telegram 通知 - 实时推送开奖和预测结果
-- 🛡️ 防封禁策略 - 随机延迟，模拟人类行为
-- 🔄 **双数据源** - 主源（中彩网）+ 备用源（500.com），自动切换
-- 💰 完全免费 - 使用 Cloudflare 免费套餐
+## 支持的彩票类型
 
-## 📋 快速开始
+- **ssq** - 双色球
+- **dlt** - 大乐透
 
-> 💡 **3 步完成初始化** → [QUICKSTART.md](./QUICKSTART.md)  
-> 💡 **部署遇到问题？** → [DEPLOY.md](./DEPLOY.md)
+## 快速开始
 
-### 1. 准备工作
-
-**Cloudflare 账号**
-- 注册：https://dash.cloudflare.com/sign-up
-
-**Telegram Bot**
-- 搜索 @BotFather，发送 `/newbot` 创建 Bot
-- 复制返回的 Token
-
-**Telegram Chat ID**
-- 搜索 @userinfobot，发送任意消息
-- 复制返回的 ID
-
-### 2. 创建 Cloudflare 资源
-
-#### D1 数据库
-1. 进入 Cloudflare Dashboard
-2. Workers & Pages > D1 > Create database
-3. 名称：`lottery_db`
-4. 复制 `database_id`，填入 `wrangler.toml`
-
-#### KV 命名空间
-1. Workers & Pages > KV > Create namespace
-2. 名称：`lottery-config`
-3. 复制 `id`，填入 `wrangler.toml`
-
-
-
-### 3. 配置 KV 存储
-
-在 KV 命名空间 `lottery-config` 中添加以下配置：
-
-| Key | Value | 说明 |
-|-----|-------|------|
-| `TELEGRAM_BOT_TOKEN` | `123456789:ABC...` | 从 @BotFather 获取 |
-| `TELEGRAM_CHAT_ID` | `123456789` | 从 @userinfobot 获取 |
-| `API_KEY` | `your-secret-key` | 自己设置一个复杂密码（至少20字符） |
-
-**如何添加：**
-1. 进入 KV 命名空间
-2. 点击 "Add entry"
-3. 输入 Key 和 Value
-4. 点击 "Add"
-
-### 4. 配置脚本环境变量
-
-复制配置模板并填写你的配置：
-
-```bash
-cd cloudflare-worker
-cp .env.example .env
-```
-
-编辑 `.env` 文件：
-
-```bash
-# Cloudflare Worker 配置
-WORKER_URL=https://your-worker.workers.dev  # 填写你的 Worker URL
-API_KEY=your-api-key-here                   # 填写你的 API Key
-
-# 代理配置（可选）
-USE_PROXY=false
-PROXY_PORT=7897
-```
-
-> 💡 `.env` 文件已添加到 `.gitignore`，不会被提交到 Git，可以安全存储敏感信息。
-
-### 5. 更新 wrangler.toml
-
-编辑 `wrangler.toml`：
-
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "lottery_db"
-database_id = "你的database_id"  # 填写这里
-
-[[kv_namespaces]]
-binding = "CONFIG"
-id = "你的kv_id"  # 填写这里
-```
-
-### 6. 部署 Worker
-
-```bash
-cd cloudflare-worker
-
-# 登录 Cloudflare
-npx wrangler login
-
-# 部署
-npx wrangler deploy
-```
-
-部署成功后，记录 Worker URL
-
-### 7. 初始化数据库
-
-#### 创建表结构
-在 D1 控制台执行 `schema.sql` 中的 SQL：
-
-```sql
-CREATE TABLE IF NOT EXISTS ssq_lottery (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    lottery_no TEXT UNIQUE NOT NULL,
-    draw_date TEXT NOT NULL,
-    red1 TEXT NOT NULL,
-    red2 TEXT NOT NULL,
-    red3 TEXT NOT NULL,
-    red4 TEXT NOT NULL,
-    red5 TEXT NOT NULL,
-    red6 TEXT NOT NULL,
-    blue TEXT NOT NULL,
-    sorted_code TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_lottery_no ON ssq_lottery(lottery_no);
-CREATE INDEX IF NOT EXISTS idx_draw_date ON ssq_lottery(draw_date);
-CREATE INDEX IF NOT EXISTS idx_sorted_code ON ssq_lottery(sorted_code);
-```
-
-#### 自动初始化（分批模式）
-
-由于 Cloudflare Workers 有 CPU 时间限制，系统采用**分批初始化**策略：
-
-**步骤 1: 首次触发**
-```bash
-curl -X POST https://your-worker.workers.dev/run \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-系统会检测到数据库为空，爬取 100 期数据（约 1-2 分钟）。
-
-**步骤 2: 继续触发**
-
-收到 Telegram 通知后，继续执行相同命令：
-```bash
-curl -X POST https://your-worker.workers.dev/run \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-系统会继续爬取下一批 100 期数据。
-
-**步骤 3: 重复执行**
-
-重复执行上述命令，直到收到"数据已是最新"的通知。
-
-**预计次数**：
-- 4000 期数据 ÷ 100 期/批 = 约 40 次
-- 每次间隔 1-2 分钟
-- 总耗时约 1-2 小时
-
-**或使用脚本自动化**：
-```bash
-#!/bin/bash
-# 自动初始化脚本
-for i in {1..50}; do
-  echo "执行第 $i 次..."
-  curl -X POST https://your-worker.workers.dev/run \
-    -H "Authorization: Bearer YOUR_API_KEY"
-  sleep 120  # 等待 2 分钟
-done
-```
-
-#### 手动初始化（可选）
-
-也可以使用 `/init` 接口一次性获取更多数据：
-```bash
-# 默认：尽可能多地获取数据（受 Worker CPU 时间限制）
-curl -X POST https://your-worker.workers.dev/init \
-  -H "Authorization: Bearer YOUR_API_KEY"
-
-# 指定数量：获取最近 5000 期
-curl -X POST "https://your-worker.workers.dev/init?count=5000" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-⚠️ **注意**：由于 Cloudflare Worker 有 CPU 时间限制（约 30 秒），一次性获取大量数据可能超时。建议使用分批模式（多次触发 `/run`）。
-
-### 7. 配置定时触发器
-
-在 Cloudflare Dashboard 配置定时任务：
-
-1. 进入你的 Worker 设置
-2. Triggers > Add Cron Trigger
-3. 配置：
-   - **Cron 表达式**：`0 14 * * *` (UTC 14:00 = 北京时间 22:00)
-   - **触发 URL**：`https://your-worker.workers.dev/run`
-   - **方法**：POST
-   - **Headers**：
-     - `Authorization: Bearer YOUR_API_KEY`
-     - `Content-Type: application/json`
-
-## 🔄 运行机制
-
-### 智能初始化
-
-系统会自动检测是否为首次运行：
-
-**首次运行（数据库为空）**：
-- ✅ 自动检测数据库为空
-- ✅ 每次爬取 100 期数据（避免超时）
-- ✅ 需要多次触发直到完成
-- ⏱️ 每次耗时约 1-2 分钟
-- 📊 总计约需 40 次（4000 期数据）
-
-**后续运行（有历史数据）**：
-- ✅ 智能增量爬取
-- ✅ 只爬取缺失的数据
-- ✅ 自动停止条件
-- ⏱️ 耗时约 30 秒
-
-### 增量爬取逻辑
-
-系统会智能处理各种情况：
-
-**情况 1: 正常情况（每天运行）**
-```
-数据库最新: 2025130
-线上最新: 2025131
-→ 爬取 2025131，保存 1 条新数据
-```
-
-**情况 2: 停止运行几天后**
-```
-数据库最新: 2025130
-线上最新: 2025135
-→ 爬取 2025131-2025135，保存 5 条新数据
-```
-
-**情况 3: 当天没有开奖**
-```
-数据库最新: 2025131
-线上最新: 2025131
-→ 数据已是最新，跳过
-```
-
-**情况 4: 期号不连续**
-```
-→ 连续 3 次未找到数据则停止
-→ 防止无限循环
-```
-
-### 安全机制
-
-- ✅ 最多爬取 100 期（防止异常）
-- ✅ 连续 3 次未找到数据则停止
-- ✅ 自动去重（数据库唯一约束）
-- ✅ 错误自动通知
-
-## 📖 API 接口
-
-| 接口 | 方法 | 说明 | 需要认证 |
-|------|------|------|----------|
-| `/` | GET | 首页，显示可用接口 | ❌ |
-| `/run` | POST | 手动执行每日任务 | ✅ |
-| `/init` | POST | 初始化数据库并导入历史数据 | ✅ |
-| `/latest` | GET | 查询最新开奖数据 | ❌ |
-| `/predict` | GET | 获取预测结果 | ❌ |
-| `/stats` | GET | 查看统计信息 | ❌ |
-| `/test` | GET | 测试 Telegram 连接 | ❌ |
-
-### 使用示例
-
-```bash
-# 测试 Telegram 连接
-curl https://your-worker.workers.dev/test
-
-# 查询最新数据
-curl https://your-worker.workers.dev/latest
-
-# 获取预测结果
-curl https://your-worker.workers.dev/predict
-
-# 查看统计信息
-curl https://your-worker.workers.dev/stats
-
-# 手动执行任务（需要认证）
-curl -X POST https://your-worker.workers.dev/run \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-## 🏗️ 项目结构
-
-```
-cloudflare-worker/
-├── src/
-│   ├── index.js              # 主入口（HTTP 路由 + 任务执行）
-│   ├── spiders/
-│   │   └── ssq.js           # 双色球爬虫
-│   ├── predictors/
-│   │   └── ssq.js           # 预测算法
-│   └── utils/
-│       ├── database.js      # D1 数据库操作
-│       └── telegram.js      # Telegram 通知
-├── .gitignore               # Git 忽略文件
-├── CHANGELOG.md             # 更新日志
-├── package.json             # 项目配置
-├── README.md                # 本文档
-├── schema.sql               # 数据库表结构
-└── wrangler.toml           # Cloudflare Workers 配置
-```
-
-## 🔧 配置说明
-
-### wrangler.toml
-
-```toml
-name = "lottery-prediction"
-main = "src/index.js"
-compatibility_date = "2024-01-01"
-
-# D1 数据库绑定
-[[d1_databases]]
-binding = "DB"
-database_name = "lottery_db"
-database_id = ""  # 填写你的 database_id
-
-# KV 命名空间绑定
-[[kv_namespaces]]
-binding = "KV_BINDING"
-id = ""  # 填写你的 KV id
-```
-
-### KV 配置项
-
-所有敏感配置存储在 KV 中：
-
-- `TELEGRAM_BOT_TOKEN` - Telegram Bot Token
-- `TELEGRAM_CHAT_ID` - Telegram Chat ID
-- `API_KEY` - API 认证密钥（自己设置）
-
-### 定时触发器
-
-- **时间**：每天 22:00 (北京时间)
-- **Cron**：`0 14 * * *` (UTC)
-- **URL**：`/run`
-- **认证**：需要 API_KEY
-
-## 🔐 安全性
-
-1. **配置管理**
-   - 所有敏感信息存储在 KV 中
-   - 不在代码中硬编码
-   - GitHub 仓库不包含密钥
-
-2. **API 认证**
-   - 敏感接口需要 Bearer Token
-   - API_KEY 存储在 KV 中
-   - 建议使用强密码（20+ 字符）
-
-3. **访问控制**
-   - `/init` 和 `/run` 需要认证
-   - 其他接口公开访问
-   - 可根据需要调整
-
-## 💰 成本
-
-**完全免费！**
-
-Cloudflare Workers 免费套餐：
-- 100,000 次请求/天
-- 5GB D1 存储
-- 10GB R2 存储
-
-本项目每天只需要几次请求，完全在免费额度内。
-
-## 🛠️ 开发
-
-### 本地开发
+### 1. 部署
 
 ```bash
 # 安装依赖
 npm install
 
-# 本地运行
-npm run dev
-
-# 查看日志
-npm run tail
+# 部署到 Cloudflare
+wrangler deploy
 ```
 
-### 更新代码
-
-1. 修改代码
-2. 推送到 GitHub
-3. Cloudflare 自动部署
-
-### 查看日志
-
-- Cloudflare Dashboard > Workers > 你的 Worker > Logs
-- 或使用命令：`npm run tail`
-
-## 📱 Telegram 通知示例
-
-系统会在每天 22:00 自动发送通知：
-
-```
-📊 双色球每日报告
-
-━━━━━━━━━━━━━━━
-🎰 最新开奖
-
-📅 期号: 2025131
-📆 日期: 2025-11-13
-
-🔴 红球: 03 13 14 18 24 31
-🔵 蓝球: 03
-
-━━━━━━━━━━━━━━━
-🔮 下期预测
-
-组合 1:
-🔴 06 07 17 22 26 32
-🔵 15
-
-组合 2:
-🔴 06 08 17 22 26 32
-🔵 15
-
-━━━━━━━━━━━━━━━
-📈 统计信息
-
-高频红球: 17(765), 26(757), 14(755)
-高频蓝球: 15(270), 16(264), 1(258)
-
-━━━━━━━━━━━━━━━
-⚠️ 仅供参考，理性购彩
-```
-
-## 🌐 数据源说明
-
-### 双数据源架构
-
-系统采用**主数据源 + 备用数据源**的架构，确保数据获取的稳定性：
-
-**主数据源：中彩网 API**
-- URL: `jc.zhcw.com`
-- 优点：数据完整，支持获取大量历史数据（1000+ 期）
-- 缺点：可能受 Cloudflare IP 限制
-
-**备用数据源：500彩票网**
-- URL: `datachart.500.com`
-- 优点：稳定性高，HTML 解析
-- 缺点：默认只返回最近30期数据
-
-### 自动切换机制
-
-系统会自动处理数据源切换：
-
-1. **首先尝试主数据源**（中彩网）
-2. **如果失败，自动切换到备用数据源**（500.com）
-3. **如果两个数据源都失败，才报错**
-
-这样可以最大程度保证数据获取的成功率。
-
-### 测试数据源
-
-可以使用测试脚本验证数据源是否正常：
+### 2. 配置
 
 ```bash
-# 本地测试
-node cloudflare-worker/test-spider.js
+# 设置 API Key
+wrangler kv:key put --binding=KV_BINDING API_KEY "your-secret-key"
+
+# 设置 Telegram
+wrangler kv:key put --binding=KV_BINDING TELEGRAM_BOT_TOKEN "your-bot-token"
+wrangler kv:key put --binding=KV_BINDING TELEGRAM_CHAT_ID "your-chat-id"
+
+# 设置默认策略
+wrangler kv:key put --binding=KV_BINDING DEFAULT_STRATEGIES "frequency,balanced,coldHot"
+wrangler kv:key put --binding=KV_BINDING DEFAULT_PREDICTION_COUNT "15"
 ```
 
-测试结果示例：
-```
-✅ 主数据源（中彩网）正常
-✅ 备用数据源（500.com）正常
-✅ 自动切换机制正常
-```
+### 3. 初始化数据
 
-### 数据源问题排查
-
-如果遇到数据获取失败：
-
-1. **查看日志**：确认是哪个数据源失败
-2. **本地测试**：运行 `test-spider.js` 验证
-3. **网络问题**：可能是 Cloudflare Worker 的出站连接限制
-4. **备选方案**：使用 Python 版本在本地爬取，然后通过 API 导入
-
-详细说明请查看：[DATA_SOURCE_FIX.md](./DATA_SOURCE_FIX.md)
-
-## 🔧 部署故障排查
-
-### 部署失败：`error occurred while running deploy command`
-
-**原因**：使用 Pages 部署但配置不正确
-
-**解决方案**：
-
-**方法 1: 使用本地部署（最简单）**
 ```bash
-cd cloudflare-worker
-npx wrangler login
-npx wrangler deploy
+# 双色球
+./scripts/init.sh ssq
+
+# 大乐透
+./scripts/init.sh dlt
 ```
 
-**方法 2: 修正 Pages 配置**
-1. 在 Cloudflare Pages 设置中：
-   - 构建命令：留空
-   - 构建输出目录：留空
-   - 根目录：`cloudflare-worker`
-2. 在 Settings > Functions 中添加绑定（不要在 wrangler.toml 中配置）：
-   - D1: 绑定名 `DB`，选择数据库
-   - KV: 绑定名 `CONFIG`，选择命名空间
-   - R2: 绑定名 `R2`，选择存储桶
-3. 重新部署
+## API 接口
 
-### 绑定错误
+### 支持多模块的接口
 
-**问题**：`wrangler.toml` 中的 `database_id` 或 `id` 为空
+```
+POST /run/{type}       - 手动执行每日任务
+POST /init/{type}      - 初始化数据库
+GET /latest/{type}     - 查询最新数据
+GET /predict/{type}    - 获取预测结果
+GET /strategies/{type} - 查看可用策略
+GET /stats/{type}      - 查看统计信息
+GET /test              - 测试 Telegram 连接
+```
+
+其中 `{type}` 可以是：`ssq`（双色球）或 `dlt`（大乐透）
+
+### 兼容旧接口
+
+以下接口默认使用双色球（向后兼容）：
+
+```
+POST /run, POST /init, GET /latest, GET /predict, GET /strategies, GET /stats
+```
+
+## 使用示例
+
+### 双色球
+
+```bash
+# 初始化数据库
+curl -X POST https://your-worker.workers.dev/init/ssq \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# 查询最新数据
+curl https://your-worker.workers.dev/latest/ssq
+
+# 预测号码
+curl "https://your-worker.workers.dev/predict/ssq?count=10&strategies=frequency,balanced"
+
+# 查看统计
+curl https://your-worker.workers.dev/stats/ssq
+```
+
+### 大乐透
+
+```bash
+# 初始化数据库
+curl -X POST https://your-worker.workers.dev/init/dlt \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# 查询最新数据
+curl https://your-worker.workers.dev/latest/dlt
+
+# 预测号码
+curl "https://your-worker.workers.dev/predict/dlt?count=15&strategies=frequency,coldHot"
+
+# 查看统计
+curl https://your-worker.workers.dev/stats/dlt
+```
+
+## 脚本工具
+
+### init.sh - 批量初始化
+
+```bash
+# 双色球
+./scripts/init.sh ssq
+
+# 大乐透
+./scripts/init.sh dlt
+```
+
+**功能**：
+- 批量导入历史数据
+- 自动断点续传
+- 每日请求限制
+- 智能停止
+
+**配置**（`.env` 文件）：
+```bash
+WORKER_URL=https://your-worker.workers.dev
+API_KEY=your-api-key
+SLEEP_TIME=120
+DAILY_REQUEST_LIMIT=500
+AUTO_CONTINUE=false
+```
+
+详见：[scripts/INIT_USAGE.md](./scripts/INIT_USAGE.md)
+
+## 定时任务
+
+在 Cloudflare Dashboard 中配置触发器：
+
+### 配置方式
+
+- **Cron 表达式**：`30 13 * * *`（每天 21:30 北京时间）
+- **触发函数**：`runDailyTask`
+
+**说明**：定时任务会自动处理所有彩票类型（双色球和大乐透），无需配置多个触发器。系统会：
+1. 同时检查双色球和大乐透的最新数据
+2. 如有新数据则自动入库
+3. 对有新数据的彩票类型进行预测
+4. 发送综合的 Telegram 通知（包含所有彩票类型的更新和预测）
+
+## 配置文件
+
+### wrangler.toml
+
+```toml
+name = "lottery-predictor"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lottery_db"
+database_id = "your-database-id"
+
+[[kv_namespaces]]
+binding = "KV_BINDING"
+id = "your-kv-id"
+
+[vars]
+DEFAULT_STRATEGIES = "frequency,balanced,coldHot"
+DEFAULT_PREDICTION_COUNT = "15"
+```
+
+## 目录结构
+
+```
+cloudflare-worker/
+├── src/
+│   ├── index.js              # 主入口
+│   ├── spiders/
+│   │   ├── ssq.js           # 双色球爬虫
+│   │   └── dlt.js           # 大乐透爬虫
+│   ├── predictors/
+│   │   ├── ssq.js           # 双色球预测器
+│   │   ├── dlt.js           # 大乐透预测器
+│   │   └── strategies/      # 预测策略
+│   │       ├── ssq/         # 双色球策略
+│   │       └── dlt/         # 大乐透策略
+│   └── utils/
+│       ├── database.js      # 数据库工具
+│       └── telegram.js      # Telegram 通知
+├── scripts/
+│   ├── init.sh              # 初始化脚本
+│   ├── INIT_USAGE.md        # 使用指南
+│   └── README.md            # 脚本说明
+├── docs/                    # 文档目录
+├── .env.example             # 配置示例
+├── package.json
+├── wrangler.toml
+└── README.md                # 本文件
+```
+
+## 预测策略
+
+| 策略 | 说明 |
+|------|------|
+| frequency | 频率策略 - 基于历史高频号码 |
+| random | 随机策略 - 完全随机选择 |
+| balanced | 均衡策略 - 大小号均衡分布 |
+| coldHot | 冷热号策略 - 结合冷热号 |
+
+## 故障排查
+
+### 问题1：401 Unauthorized
+
+**原因**：API Key 未配置或错误
 
 **解决**：
-1. 在 Cloudflare Dashboard 创建资源
-2. 复制 ID 填入 `wrangler.toml`
-3. 或在 Pages Settings > Functions 中配置绑定
-
-## ❓ 常见问题
-
-### Q: 应该用 Pages 还是 Workers？
-
-A: 
-- **本地部署**：使用 `wrangler deploy`，部署为 Worker
-- **GitHub 自动部署**：使用 Pages，但需要在 Dashboard 配置绑定
-
-### Q: 部署失败怎么办？
-
-A: 
-1. 优先使用本地部署：`npx wrangler deploy`
-2. 如果使用 Pages，确保在 Settings > Functions 中配置了所有绑定
-3. 查看 Cloudflare Dashboard 的部署日志
-
-### Q: 如何修改定时任务时间？
-
-A: 在 Cloudflare Dashboard 的 Triggers 中修改 Cron 表达式：
-- `0 14 * * *` - 22:00 北京时间
-- `0 13 * * *` - 21:00 北京时间
-- `0 12 * * *` - 20:00 北京时间
-
-### Q: 如何查看日志？
-
-A: 
-1. Cloudflare Dashboard > Workers > 你的 Worker > Logs
-2. 或使用命令：`npm run tail`
-
-### Q: 如何更新代码？
-
-A: 推送到 GitHub，Cloudflare 会自动部署
-
-### Q: 触发器不工作？
-
-A: 检查：
-1. URL 是否正确
-2. Authorization Header 是否正确
-3. API_KEY 是否匹配
-4. 触发器是否已启用
-
-### Q: KV 配置不生效？
-
-A: 检查：
-1. KV 命名空间是否已创建
-2. KV `id` 是否已填入 `wrangler.toml`
-3. KV 绑定名称是否为 `CONFIG`
-4. KV 中的配置项是否已添加
-
-### Q: 如何备份数据？
-
-A: 数据会自动备份到 R2，也可以手动导出：
 ```bash
-# 在 D1 控制台执行
-SELECT * FROM ssq_lottery ORDER BY draw_date DESC;
+wrangler kv:key put --binding=KV_BINDING API_KEY "your-secret-key"
 ```
 
-### Q: 如何生成强密码？
+### 问题2：404 Not Found
 
-A: 使用密码生成器或命令：
+**原因**：接口路径错误
+
+**解决**：确保路径包含彩票类型
 ```bash
-openssl rand -base64 32
+# 错误
+curl https://your-worker.workers.dev/predict
+
+# 正确
+curl https://your-worker.workers.dev/predict/dlt
 ```
 
-## ⚠️ 免责声明
+### 问题3：500 Internal Server Error
 
-本项目仅供学习和研究使用，严禁用于任何商业或非法用途。
+**原因**：数据库未初始化
 
-- 所有预测结果基于历史数据统计，不代表未来结果
-- 不保证任何中奖概率
-- 请理性对待彩票，切勿沉迷
-- 使用本项目产生的任何后果由使用者自行承担
+**解决**：
+```bash
+curl -X POST https://your-worker.workers.dev/init/dlt \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
 
-## 📄 许可证
+## 相关文档
+
+- [API 使用文档](./API_USAGE.md) - 详细的 API 说明
+- [脚本使用指南](./scripts/INIT_USAGE.md) - init.sh 使用说明
+- [部署指南](./docs/DEPLOY.md) - 部署步骤
+
+## 技术栈
+
+- Cloudflare Workers
+- D1 数据库
+- KV 存储
+- Telegram Bot API
+
+## 许可证
 
 MIT License
 
 ---
 
-**如果觉得有用，请给项目一个 Star ⭐**
+**版本**：2.0.0  
+**更新日期**：2025-11-18

@@ -34,9 +34,36 @@ if [ "$USE_PROXY" = "true" ]; then
   echo "🔧 使用代理: 127.0.0.1:$PROXY_PORT"
 fi
 
+# 彩票类型（可通过参数指定，默认为 ssq）
+LOTTERY_TYPE=${1:-ssq}
+
+# 验证彩票类型
+if [ "$LOTTERY_TYPE" != "ssq" ] && [ "$LOTTERY_TYPE" != "dlt" ]; then
+  echo "❌ 错误：不支持的彩票类型 '$LOTTERY_TYPE'"
+  echo "💡 支持的类型："
+  echo "   ssq - 双色球"
+  echo "   dlt - 大乐透"
+  echo ""
+  echo "使用方法："
+  echo "   $0 ssq  # 初始化双色球"
+  echo "   $0 dlt  # 初始化大乐透"
+  exit 1
+fi
+
+# 设置彩票名称
+case "$LOTTERY_TYPE" in
+  ssq)
+    LOTTERY_NAME="双色球"
+    ;;
+  dlt)
+    LOTTERY_NAME="大乐透"
+    ;;
+esac
+
 echo ""
-echo "🚀 彩票数据初始化"
+echo "🚀 ${LOTTERY_NAME}数据初始化"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "彩票类型: $LOTTERY_TYPE ($LOTTERY_NAME)"
 echo "Worker URL: $WORKER_URL"
 echo "每日限制: $DAILY_REQUEST_LIMIT 次"
 echo "爬取间隔: $SLEEP_TIME 秒"
@@ -136,8 +163,8 @@ while true; do
   echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
   echo ""
   
-  # 调用 /init API（全量爬取模式）
-  response=$(curl -s -X POST "$WORKER_URL/init" \
+  # 调用 /init/{type} API（全量爬取模式）
+  response=$(curl -s -X POST "$WORKER_URL/init/$LOTTERY_TYPE" \
     -H "Authorization: Bearer $API_KEY" \
     -H "Content-Type: application/json")
   
@@ -196,12 +223,12 @@ while true; do
         echo ""
         
         # 获取详细统计
-        stats=$(curl -s "$WORKER_URL/stats")
+        stats=$(curl -s "$WORKER_URL/stats/$LOTTERY_TYPE")
         echo "📈 详细统计："
         echo "$stats" | jq '.' 2>/dev/null || echo "$stats"
         echo ""
         
-        echo "✅ 所有历史数据已成功导入！"
+        echo "✅ ${LOTTERY_NAME}所有历史数据已成功导入！"
         exit 0
       fi
     else
@@ -213,9 +240,13 @@ while true; do
     fi
     
     # 如果数据量已经很大，提示用户
-    if [ "$total" -ge 3000 ]; then
+    if [ "$LOTTERY_TYPE" = "ssq" ] && [ "$total" -ge 3000 ]; then
       echo ""
       echo "💡 提示：数据库已有 $total 条数据（双色球从2003年开始，约有3000+期）"
+      echo "   如果数据量接近历史总期数，可能即将完成"
+    elif [ "$LOTTERY_TYPE" = "dlt" ] && [ "$total" -ge 2700 ]; then
+      echo ""
+      echo "💡 提示：数据库已有 $total 条数据（大乐透从2007年开始，约有2700+期）"
       echo "   如果数据量接近历史总期数，可能即将完成"
     fi
   else

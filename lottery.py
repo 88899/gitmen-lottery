@@ -21,23 +21,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  # 爬取双色球全量数据
-  python lottery.py fetch ssq --mode full
+  # 双色球
+  python lottery.py fetch ssq --mode full     # 爬取全量数据
+  python lottery.py fetch ssq --mode latest   # 爬取最新数据
+  python lottery.py predict ssq               # 预测号码
+  python lottery.py schedule ssq              # 启动定时任务
   
-  # 爬取双色球最新数据
-  python lottery.py fetch ssq --mode latest
+  # 大乐透
+  python lottery.py fetch dlt --mode full     # 爬取全量数据
+  python lottery.py fetch dlt --mode latest   # 爬取最新数据
+  python lottery.py predict dlt               # 预测号码
   
-  # 预测双色球
-  python lottery.py predict ssq
-  
-  # 启动双色球定时任务
-  python lottery.py schedule ssq
-  
-  # 爬取大乐透数据
-  python lottery.py fetch dlt --mode full
-  
-  # 预测大乐透
-  python lottery.py predict dlt
+  # 定时任务（自动处理所有彩票类型）
+  python lottery.py schedule                  # 启动定时任务（双色球+大乐透）
 
 支持的彩票类型:
   ssq  - 双色球
@@ -71,13 +67,8 @@ def main():
         help='彩票类型'
     )
     
-    # schedule 命令
-    schedule_parser = subparsers.add_parser('schedule', help='定时任务')
-    schedule_parser.add_argument(
-        'lottery',
-        choices=SUPPORTED_LOTTERIES,
-        help='彩票类型'
-    )
+    # schedule 命令（不需要指定彩票类型，自动处理所有类型）
+    schedule_parser = subparsers.add_parser('schedule', help='定时任务（自动处理所有彩票类型）')
     
     args = parser.parse_args()
     
@@ -96,7 +87,7 @@ def main():
         predict.predict(args.lottery)
     
     elif args.command == 'schedule':
-        schedule.start_schedule(args.lottery)
+        schedule.start_schedule()
 
 
 if __name__ == '__main__':

@@ -1,53 +1,162 @@
 # 🎰 彩票预测系统
 
-基于历史数据分析的彩票预测系统，支持双色球（SSQ）等多种彩票。
+基于历史数据分析的彩票预测系统，支持双色球和大乐透。
 
-提供 **Cloudflare Workers** 和 **Python** 两个版本，满足不同场景需求。
+提供 **Python** 和 **Cloudflare Workers** 两个版本。
 
 ## ✨ 特性
 
-- 🔄 **双数据源**：中彩网 + 500.com，自动切换，稳定可靠
-- 🤖 **智能爬取**：全量初始化 + 增量更新，不漏数据
-- 📊 **多维预测**：频率分析、遗漏分析、冷热分析
-- 📱 **Telegram 通知**：实时推送开奖和预测结果
-- ☁️ **无服务器**：Cloudflare Workers 版本，完全免费
-- 🐍 **本地运行**：Python 版本，功能完整
+- 🎯 **双彩票支持**：双色球（SSQ）+ 大乐透（DLT）
+- 🔄 **数据源**：500.com，稳定可靠
+- 🤖 **智能爬取**：全量初始化 + 增量更新
+- 📊 **多策略预测**：频率、随机、均衡、冷热号
+- 📱 **Telegram 通知**：实时推送预测结果
+- ☁️ **双版本**：Python 本地版 + Worker 云端版
 
 ## 🚀 快速开始
 
-### Cloudflare Workers 版本（推荐）
-
-**优势**：完全免费、自动扩展、全球 CDN
-
-```bash
-# 1. 部署
-cd cloudflare-worker
-npx wrangler deploy
-
-# 2. 初始化数据
-bash scripts/init.sh
-
-# 3. 配置定时任务（在 Cloudflare Dashboard）
-```
-
-详细文档：[cloudflare-worker/README.md](./cloudflare-worker/README.md)
-
 ### Python 版本
-
-**优势**：功能丰富、易于扩展、本地运行
 
 ```bash
 # 1. 安装依赖
 pip install -r requirements.txt
 
-# 2. 配置环境
+# 2. 配置
 cp .env.example .env
-# 编辑 .env 文件
+vim .env
 
-# 3. 初始化数据库
-python scripts/init_database.py
+# 3. 爬取数据
+python lottery.py fetch dlt --mode full
 
-# 4. 运行
+# 4. 预测号码
+python lottery.py predict dlt
+```
+
+### Cloudflare Workers 版本
+
+```bash
+# 1. 部署
+cd cloudflare-worker
+wrangler deploy
+
+# 2. 初始化数据
+./scripts/init.sh dlt
+
+# 3. 使用 API
+curl https://your-worker.workers.dev/predict/dlt
+```
+
+## 📖 文档
+
+- [快速开始](./GETTING_STARTED.md) - 详细的入门指南
+- [Python 版本](./lotteries/dlt/README.md) - Python 使用说明
+- [Worker 版本](./cloudflare-worker/README.md) - Worker 使用说明
+- [API 文档](./cloudflare-worker/API_USAGE.md) - API 接口说明
+
+## 🎲 支持的彩票
+
+| 彩票 | 代码 | 规则 | 开奖时间 |
+|------|------|------|---------|
+| 双色球 | ssq | 红球 1-33 选 6，蓝球 1-16 选 1 | 周二、四、日 |
+| 大乐透 | dlt | 前区 1-35 选 5，后区 1-12 选 2 | 周一、三、六 |
+
+## 🔧 使用示例
+
+### Python 版本
+
+```bash
+# 双色球
+python lottery.py fetch ssq --mode full
+python lottery.py predict ssq
+
+# 大乐透
+python lottery.py fetch dlt --mode full
+python lottery.py predict dlt
+
+# 定时任务（自动处理所有彩票类型）
+python lottery.py schedule
+```
+
+### Worker 版本
+
+```bash
+# 双色球
+curl https://your-worker.workers.dev/latest/ssq
+curl https://your-worker.workers.dev/predict/ssq
+
+# 大乐透
+curl https://your-worker.workers.dev/latest/dlt
+curl https://your-worker.workers.dev/predict/dlt
+```
+
+## 📊 预测策略
+
+| 策略 | 说明 |
+|------|------|
+| frequency | 基于历史高频号码 |
+| random | 完全随机选择 |
+| balanced | 大小号均衡分布 |
+| coldHot | 结合冷热号 |
+
+## 🛠️ 技术栈
+
+### Python 版本
+- Python 3.8+
+- MySQL 5.7+
+- BeautifulSoup4
+- APScheduler
+
+### Worker 版本
+- Cloudflare Workers
+- D1 数据库
+- KV 存储
+
+## 📁 项目结构
+
+```
+lottery-predictor/
+├── lotteries/          # 彩票模块
+│   ├── ssq/           # 双色球
+│   └── dlt/           # 大乐透
+├── cli/               # CLI 命令
+├── core/              # 核心模块
+├── cloudflare-worker/ # Worker 版本
+├── lottery.py         # 主入口
+└── README.md          # 本文件
+```
+
+## 📝 配置
+
+在 `.env` 文件中配置：
+
+```bash
+# 数据库
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=lottery_db
+
+# 预测策略
+DEFAULT_STRATEGIES=frequency,balanced,coldHot
+DEFAULT_PREDICTION_COUNT=15
+
+# Telegram（可选）
+TELEGRAM_BOT_TOKEN=your_token
+TELEGRAM_CHAT_ID=your_chat_id
+```
+
+## ⚠️ 免责声明
+
+本项目仅供学习和研究使用，不构成任何投资建议。彩票具有随机性，请理性购彩。
+
+## 📄 许可证
+
+MIT License
+
+---
+
+**版本**：2.0.0  
+**更新日期**：2025-11-18
 python lottery.py
 ```
 

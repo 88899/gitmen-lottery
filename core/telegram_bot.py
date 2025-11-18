@@ -135,6 +135,30 @@ class TelegramBot:
             
             message += "━━━━━━━━━━━━━━━\n"
             message += "⚠️ 仅供参考，理性购彩"
+            
+        elif lottery_type == 'dlt':
+            message = "🔮 <b>大乐透预测</b>\n\n"
+            
+            for i, pred in enumerate(predictions[:5], 1):
+                front_balls = pred.get('front_balls', [])
+                back_balls = pred.get('back_balls', [])
+                strategy_name = pred.get('strategy_name', '')
+                
+                front_str = ' '.join([f"{x:02d}" for x in front_balls])
+                back_str = ' '.join([f"{x:02d}" for x in back_balls])
+                
+                message += f"<b>组合 {i}:</b>"
+                
+                # 添加策略名称（如果有）
+                if strategy_name:
+                    message += f" <i>[{strategy_name}]</i>"
+                
+                message += "\n"
+                message += f"🔴 前区: <code>{front_str}</code>\n"
+                message += f"🔵 后区: <code>{back_str}</code>\n\n"
+            
+            message += "━━━━━━━━━━━━━━━\n"
+            message += "⚠️ 仅供参考，理性购彩"
         else:
             message = f"预测结果: {lottery_type}"
 
