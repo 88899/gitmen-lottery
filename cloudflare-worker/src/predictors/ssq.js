@@ -1,21 +1,34 @@
 /**
  * 双色球预测器 - Cloudflare Worker 版本
- * 基于历史数据进行智能预测
+ * 支持多种预测策略的组合使用
  */
 
+import { getStrategy, getAllStrategies } from './strategies/index.js';
+
 export class SSQPredictor {
-  constructor(db) {
+  constructor(db, options = {}) {
     this.db = db;
-    this.RED_RANGE = Array.from({ length: 33 }, (_, i) => (i + 1).toString().padStart(2, '0'));
-    this.BLUE_RANGE = Array.from({ length: 16 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+    
+    // 默认策略配置
+    this.defaultStrategies = options.strategies || ['frequency'];
+    
+    // 每个策略生成的组合数
+    this.countPerStrategy = options.countPerStrategy || null;
   }
 
   /**
    * 执行预测
-   * @param {number} count - 预测组合数
+   * @param {number} count - 预测组合总数
+   * @param {Array} strategies - 使用的策略列表（可选）
+   * @returns {Array} 预测结果
    */
-  async predict(count = 5) {
+  async predict(count = 5, strategies = null) {
     try {
+      // 使用指定策略或默认策略
+      const strategyNames = strategies || this.defaultStrategies;
+      
+      console.log(`使用策略: ${strategyNames.join(', ')}`);
+      
       // 获取历史数据
       const historyData = await this.db.getAll('ssq', 500);
       
@@ -29,37 +42,46 @@ export class SSQPredictor {
       // 获取历史组合（用于去重）
       const historicalCombinations = await this.db.getHistoricalCombinations('ssq');
 
-      // 生成预测组合
+      // 构建上下文数据
+      const context = {
+        historyData,
+        redFrequency: frequency.red,
+        blueFrequency: frequency.blue,
+        historicalCombinations
+      };
+
+      // 计算每个策略生成的组合数
+      const countPerStrategy = this.countPerStrategy || Math.ceil(count / strategyNames.length);
+      
+      // 使用多个策略生成预测
       const predictions = [];
-      const maxAttempts = count * 100; // 最多尝试次数
-      let attempts = 0;
-
-      while (predictions.length < count && attempts < maxAttempts) {
-        attempts++;
-
-        // 生成红球组合
-        const redBalls = this.generateRedBalls(frequency.red, historicalCombinations);
+      
+      for (const strategyName of strategyNames) {
+        const strategyPredictions = await this.predictWithStrategy(
+          strategyName,
+          countPerStrategy,
+          context,
+          predictions
+        );
         
-        // 生成蓝球
-        const blueBall = this.generateBlueBall(frequency.blue);
-
-        // 检查是否重复
-        const sortedCode = redBalls.sort().join(',') + '-' + blueBall;
+        predictions.push(...strategyPredictions);
         
-        if (!historicalCombinations.has(sortedCode) && 
-            !predictions.some(p => p.sorted_code === sortedCode)) {
-          predictions.push({
-            rank: predictions.length + 1,
-            red_balls: redBalls,
-            blue_ball: blueBall,
-            sorted_code: sortedCode,
-            prediction_time: new Date().toISOString()
-          });
+        // 如果已经生成足够的组合，停止
+        if (predictions.length >= count) {
+          break;
         }
       }
 
-      console.log(`生成了 ${predictions.length} 个预测组合`);
-      return predictions;
+      // 截取到指定数量
+      const finalPredictions = predictions.slice(0, count);
+      
+      // 添加排名
+      finalPredictions.forEach((pred, index) => {
+        pred.rank = index + 1;
+      });
+
+      console.log(`生成了 ${finalPredictions.length} 个预测组合`);
+      return finalPredictions;
     } catch (error) {
       console.error('预测失败:', error);
       throw error;
@@ -67,102 +89,57 @@ export class SSQPredictor {
   }
 
   /**
-   * 生成红球组合
+   * 使用指定策略生成预测
+   * @param {string} strategyName - 策略名称
+   * @param {number} count - 生成数量
+   * @param {Object} context - 上下文数据
+   * @param {Array} existingPredictions - 已生成的预测（用于去重）
+   * @returns {Array} 预测结果
    */
-  generateRedBalls(redFrequency, historicalCombinations) {
-    const balls = [];
-    
-    // 策略：70% 高频号码 + 30% 随机号码
-    const topBalls = redFrequency.slice(0, 15).map(item => item.ball);
-    
-    // 选择 4 个高频号码
-    const highFreqBalls = this.randomSelect(topBalls, 4);
-    balls.push(...highFreqBalls);
-    
-    // 选择 2 个随机号码（不重复）
-    const remainingBalls = this.RED_RANGE.filter(b => !balls.includes(b));
-    const randomBalls = this.randomSelect(remainingBalls, 2);
-    balls.push(...randomBalls);
-    
-    // 验证组合有效性
-    if (!this.isValidRedCombination(balls)) {
-      // 如果无效，重新生成
-      return this.generateRedBalls(redFrequency, historicalCombinations);
-    }
-    
-    return balls.sort();
-  }
+  async predictWithStrategy(strategyName, count, context, existingPredictions = []) {
+    const strategy = getStrategy(strategyName);
+    const predictions = [];
+    const maxAttempts = count * 100; // 最多尝试次数
+    let attempts = 0;
 
-  /**
-   * 生成蓝球
-   */
-  generateBlueBall(blueFrequency) {
-    // 策略：80% 概率选择高频蓝球，20% 概率随机
-    if (Math.random() < 0.8 && blueFrequency.length > 0) {
-      // 从前5个高频蓝球中随机选择
-      const topBlue = blueFrequency.slice(0, 5);
-      return topBlue[Math.floor(Math.random() * topBlue.length)].ball;
-    } else {
-      // 随机选择
-      return this.BLUE_RANGE[Math.floor(Math.random() * this.BLUE_RANGE.length)];
-    }
-  }
+    console.log(`使用 ${strategy.name} 生成 ${count} 个组合...`);
 
-  /**
-   * 验证红球组合是否有效
-   * 规则：不能有超过3个连号
-   */
-  isValidRedCombination(balls) {
-    const sorted = balls.map(b => parseInt(b)).sort((a, b) => a - b);
-    
-    let consecutiveCount = 1;
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i] - sorted[i - 1] === 1) {
-        consecutiveCount++;
-        if (consecutiveCount >= 3) {
-          return false; // 超过3个连号
-        }
-      } else {
-        consecutiveCount = 1;
+    while (predictions.length < count && attempts < maxAttempts) {
+      attempts++;
+
+      // 使用策略生成红球和蓝球
+      const redBalls = strategy.generateRedBalls(context);
+      const blueBall = strategy.generateBlueBall(context);
+
+      // 检查是否重复
+      const sortedCode = [...redBalls].sort().join(',') + '-' + blueBall;
+      
+      const isDuplicate = 
+        context.historicalCombinations.has(sortedCode) ||
+        existingPredictions.some(p => p.sorted_code === sortedCode) ||
+        predictions.some(p => p.sorted_code === sortedCode);
+      
+      if (!isDuplicate) {
+        predictions.push({
+          red_balls: redBalls,
+          blue_ball: blueBall,
+          sorted_code: sortedCode,
+          strategy: strategyName,
+          strategy_name: strategy.name,
+          prediction_time: new Date().toISOString()
+        });
       }
     }
-    
-    return true;
+
+    console.log(`${strategy.name} 生成了 ${predictions.length} 个组合`);
+    return predictions;
   }
 
   /**
-   * 从数组中随机选择 n 个不重复的元素
+   * 获取所有可用策略
    */
-  randomSelect(array, n) {
-    const shuffled = [...array].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, n);
+  static getAvailableStrategies() {
+    return getAllStrategies();
   }
 
-  /**
-   * 计算组合得分（用于排序）
-   */
-  scoreCombin(redBalls, redFrequency) {
-    let score = 0;
-    
-    // 频率得分
-    for (const ball of redBalls) {
-      const freq = redFrequency.find(f => f.ball === ball);
-      if (freq) {
-        score += freq.count;
-      }
-    }
-    
-    // 分布得分（号码分布越均匀得分越高）
-    const sorted = redBalls.map(b => parseInt(b)).sort((a, b) => a - b);
-    const gaps = [];
-    for (let i = 1; i < sorted.length; i++) {
-      gaps.push(sorted[i] - sorted[i - 1]);
-    }
-    const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-    const idealGap = 33 / 6; // 理想间距
-    const gapScore = 100 - Math.abs(avgGap - idealGap) * 10;
-    score += gapScore;
-    
-    return score;
-  }
 }

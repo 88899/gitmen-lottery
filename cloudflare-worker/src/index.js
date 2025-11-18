@@ -17,13 +17,15 @@ async function getConfig(env) {
   const config = {
     telegramBotToken: await env.KV_BINDING.get('TELEGRAM_BOT_TOKEN'),
     telegramChatId: await env.KV_BINDING.get('TELEGRAM_CHAT_ID'),
-    apiKey: await env.KV_BINDING.get('API_KEY')
+    apiKey: await env.KV_BINDING.get('API_KEY'),
+    defaultStrategies: await env.KV_BINDING.get('DEFAULT_STRATEGIES')
   };
   
   // 如果 KV 中没有配置，尝试从环境变量获取（兼容性）
   if (!config.telegramBotToken) config.telegramBotToken = env.TELEGRAM_BOT_TOKEN;
   if (!config.telegramChatId) config.telegramChatId = env.TELEGRAM_CHAT_ID;
   if (!config.apiKey) config.apiKey = env.API_KEY;
+  if (!config.defaultStrategies) config.defaultStrategies = env.DEFAULT_STRATEGIES || 'frequency';
   
   return config;
 }
@@ -41,118 +43,135 @@ async function runDailyTask(env) {
   try {
     const db = new Database(env.DB);
     const spider = new SSQSpider();
-    const predictor = new SSQPredictor(db);
+    
+    // 解析默认策略配置
+    const defaultStrategies = config.defaultStrategies.split(',').map(s => s.trim());
+    const predictor = new SSQPredictor(db, { strategies: defaultStrategies });
     
     // /run 接口专注于增量更新
     // 用途：每日定时任务，检查并获取最新数据
-    // 特点：从数据库最新期号开始，往后爬取到线上最新期号
+    // 策略：从 500.com 获取最新一期，与数据库比较，如果不存在则入库
     
     console.log('开始增量更新模式...');
     
-    // 获取数据库中最新的期号
+    // 获取数据库中最新的一期（按开奖日期排序）
     const latestInDb = await db.getLatest('ssq');
-    const dbLotteryNo = latestInDb ? latestInDb.lottery_no : null;
-    console.log(`数据库最新期号: ${dbLotteryNo}`);
+    console.log(`数据库最新记录: ${latestInDb ? `${latestInDb.lottery_no} (${latestInDb.draw_date})` : '无数据'}`);
     
-    // 爬取线上最新数据
-    const latestOnline = await spider.fetchLatest();
-    if (!latestOnline) {
-      console.log('未获取到线上最新数据');
-      return { success: false, message: '未获取到线上数据' };
+    // 从 500.com 获取最新一期数据
+    console.log('从 500.com 获取最新一期数据...');
+    
+    let latestOnline = null;
+    
+    try {
+      const url = 'https://datachart.500.com/ssq/history/history.shtml';
+      
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`📊 数据源: 500.com (增量爬取)`);
+      console.log(`🔗 URL: ${url}`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://www.500.com/',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const html = await response.text();
+      
+      // 解析 HTML，获取最新一期数据
+      const dataList = spider.parse500Html(html);
+      
+      // 检查返回值
+      if (!Array.isArray(dataList) || dataList.length === 0) {
+        throw new Error('未解析到数据');
+      }
+      
+      // 取第一条（最新一期）
+      latestOnline = dataList[0];
+      console.log(`线上最新记录: ${latestOnline.lottery_no} (${latestOnline.draw_date})`);
+      
+    } catch (error) {
+      console.error('从 500.com 获取最新数据失败:', error.message);
+      
+      // 降级：使用中彩网
+      console.log('降级到中彩网获取最新数据...');
+      try {
+        latestOnline = await spider.fetchLatestFromZhcw();
+        console.log(`线上最新记录（中彩网）: ${latestOnline.lottery_no} (${latestOnline.draw_date})`);
+      } catch (zhcwError) {
+        console.error('中彩网也失败:', zhcwError.message);
+        return {
+          success: false,
+          message: '所有数据源均失败',
+          mode: 'incremental',
+          primary_error: error.message,
+          fallback_error: zhcwError.message
+        };
+      }
     }
     
-    const onlineLotteryNo = latestOnline.lottery_no;
-    console.log(`线上最新期号: ${onlineLotteryNo}`);
-    
-    // 如果线上最新期号与数据库一致，说明没有新数据
-    if (dbLotteryNo === onlineLotteryNo) {
+    // 比较数据库和线上的最新记录
+    if (latestInDb && latestInDb.lottery_no === latestOnline.lottery_no) {
       console.log('数据已是最新，无需更新');
-      return { 
-        success: true, 
-        message: '数据已是最新', 
-        mode: 'incremental',
-        lottery_no: dbLotteryNo 
-      };
-    }
-    
-    // 有新数据，开始增量爬取
-    // 策略：从数据库最新期号的下一期开始，往后爬到线上最新期号
-    console.log('检测到新数据，开始增量爬取...');
-    const newDataList = [];
-    
-    // 计算起始期号（数据库最新期号 + 1）
-    const dbIssueNum = parseInt(dbLotteryNo);
-    const onlineIssueNum = parseInt(onlineLotteryNo);
-    
-    console.log(`需要爬取期号范围: ${dbIssueNum + 1} 到 ${onlineIssueNum}`);
-    
-    // 从数据库最新期号的下一期开始，逐个爬取到线上最新期号
-    for (let issueNum = dbIssueNum + 1; issueNum <= onlineIssueNum; issueNum++) {
-      const currentIssue = issueNum.toString().padStart(dbLotteryNo.length, '0');
-      
-      // 检查是否已存在（防止重复）
-      const exists = await db.checkExists('ssq', currentIssue);
-      if (exists) {
-        console.log(`期号 ${currentIssue} 已存在，跳过`);
-        continue;
-      }
-      
-      // 获取当前期号的数据
-      const issueData = await spider.fetchIssueDetail(currentIssue);
-      
-      if (issueData) {
-        console.log(`获取到新数据: ${currentIssue}`);
-        newDataList.push(issueData);
-      } else {
-        console.log(`期号 ${currentIssue} 未找到数据，跳过`);
-      }
-      
-      // 安全限制：最多爬取 100 期
-      if (newDataList.length >= 100) {
-        console.log('已爬取 100 期，停止');
-        break;
-      }
-    }
-    
-    // 保存新数据
-    if (newDataList.length > 0) {
-      console.log(`准备保存 ${newDataList.length} 条新数据`);
-      
-      // 按期号排序（从旧到新）
-      newDataList.sort((a, b) => a.lottery_no.localeCompare(b.lottery_no));
-      
-      const result = await db.batchInsert('ssq', newDataList);
-      console.log(`保存完成: 新增 ${result.inserted} 条`);
-      
-      // 预测下一期
-      const predictions = await predictor.predict(5);
-      
-      // 获取统计信息
-      const frequency = await db.getFrequency('ssq');
-      const stats = {
-        top_red: frequency.red.slice(0, 5),
-        top_blue: frequency.blue.slice(0, 3)
-      };
-      
-      // 发送通知（使用最新一期的数据）
-      const latestNew = newDataList[newDataList.length - 1];
-      await telegram.sendDailyReport(latestNew, predictions, stats);
-      
       return {
         success: true,
-        message: '增量更新完成',
+        message: '数据已是最新',
         mode: 'incremental',
-        new_count: result.inserted,
-        latest_lottery_no: latestNew.lottery_no
-      };
-    } else {
-      console.log('没有新数据需要保存');
-      return {
-        success: true,
-        message: '没有新数据',
-        mode: 'incremental'
+        lottery_no: latestInDb.lottery_no,
+        draw_date: latestInDb.draw_date
       };
     }
+    
+    // 有新数据，检查是否已存在
+    console.log('检测到新数据，检查是否需要入库...');
+    
+    const exists = await db.checkExists('ssq', latestOnline.lottery_no);
+    
+    if (exists) {
+      console.log(`期号 ${latestOnline.lottery_no} 已存在数据库，无需更新`);
+      return {
+        success: true,
+        message: '数据已存在',
+        mode: 'incremental',
+        lottery_no: latestOnline.lottery_no,
+        draw_date: latestOnline.draw_date
+      };
+    }
+    
+    // 新数据，入库
+    console.log(`准备入库新数据: ${latestOnline.lottery_no} (${latestOnline.draw_date})`);
+    
+    const result = await db.batchInsert('ssq', [latestOnline]);
+    console.log(`入库完成: 新增 ${result.inserted} 条`);
+    
+    // 预测下一期
+    const predictions = await predictor.predict(5);
+    
+    // 获取统计信息
+    const frequency = await db.getFrequency('ssq');
+    const stats = {
+      top_red: frequency.red.slice(0, 5),
+      top_blue: frequency.blue.slice(0, 3)
+    };
+    
+    // 发送通知
+    await telegram.sendDailyReport(latestOnline, predictions, stats);
+    
+    return {
+      success: true,
+      message: '增量更新完成',
+      mode: 'incremental',
+      new_count: result.inserted,
+      lottery_no: latestOnline.lottery_no,
+      draw_date: latestOnline.draw_date
+    };
     
   } catch (error) {
     console.error('每日任务执行失败:', error);
@@ -184,7 +203,8 @@ export default {
         '  POST /run - 手动执行每日任务\n' +
         '  POST /init - 初始化数据库并导入历史数据\n' +
         '  GET /latest - 查询最新开奖数据\n' +
-        '  GET /predict - 获取预测结果\n' +
+        '  GET /predict?count=5&strategies=frequency,balanced - 获取预测结果\n' +
+        '  GET /strategies - 查看可用预测策略\n' +
         '  GET /stats - 查看统计信息\n' +
         '  GET /test - 测试 Telegram 连接\n\n' +
         '说明：定时任务通过 Cloudflare Dashboard 的触发器配置\n',
@@ -254,6 +274,30 @@ export default {
             
             allData = await spider.fetchAllFrom500(50, oldest.lottery_no);
             
+            // 检查返回值是否为有效数组
+            if (!Array.isArray(allData)) {
+              console.log(`\n========================================`);
+              console.log(`❌ 爬取失败: 返回值不是数组`);
+              console.log(`   数据源: ${dataSource}`);
+              console.log(`   查询参数: start=${queryParams.start}, end=${queryParams.end}`);
+              console.log(`   返回值:`, JSON.stringify(allData));
+              console.log(`========================================\n`);
+              
+              // 返回错误信息并终止
+              return new Response(
+                JSON.stringify({
+                  success: false,
+                  message: allData.message || '未获取到数据',
+                  source: allData.source || dataSource,
+                  params: allData.params || queryParams,
+                  total: await db.getCount('ssq')
+                }),
+                {
+                  headers: { 'Content-Type': 'application/json; charset=utf-8' }
+                }
+              );
+            }
+            
             console.log(`\n========================================`);
             console.log(`✅ 爬取完成: 获取到 ${allData.length} 条数据`);
             console.log(`   数据源: ${dataSource}`);
@@ -265,6 +309,29 @@ export default {
             console.log(`========================================\n`);
             
             allData = await spider.fetchAllFrom500(50);
+            
+            // 检查返回值是否为有效数组
+            if (!Array.isArray(allData)) {
+              console.log(`\n========================================`);
+              console.log(`❌ 爬取失败: 返回值不是数组`);
+              console.log(`   数据源: ${dataSource}`);
+              console.log(`   返回值:`, JSON.stringify(allData));
+              console.log(`========================================\n`);
+              
+              // 返回错误信息并终止
+              return new Response(
+                JSON.stringify({
+                  success: false,
+                  message: allData.message || '未获取到数据',
+                  source: allData.source || dataSource,
+                  params: allData.params || {},
+                  total: await db.getCount('ssq')
+                }),
+                {
+                  headers: { 'Content-Type': 'application/json; charset=utf-8' }
+                }
+              );
+            }
             
             if (allData.length > 0) {
               const firstIssue = allData[0].lottery_no.substring(2);
@@ -392,15 +459,44 @@ export default {
     if (url.pathname === '/predict') {
       try {
         const db = new Database(env.DB);
-        const predictor = new SSQPredictor(db);
+        
+        // 获取参数
         const count = parseInt(url.searchParams.get('count') || '5');
-        const predictions = await predictor.predict(count);
+        const strategiesParam = url.searchParams.get('strategies');
+        
+        // 解析策略参数（逗号分隔）
+        // 如果没有指定策略，使用配置的默认策略
+        let strategies = null;
+        if (strategiesParam) {
+          strategies = strategiesParam.split(',').map(s => s.trim());
+        } else {
+          // 使用配置的默认策略
+          strategies = config.defaultStrategies.split(',').map(s => s.trim());
+        }
+        
+        const predictor = new SSQPredictor(db);
+        const predictions = await predictor.predict(count, strategies);
         
         return new Response(JSON.stringify(predictions, null, 2), {
           headers: { 'Content-Type': 'application/json; charset=utf-8' }
         });
       } catch (error) {
         return new Response(`预测失败: ${error.message}`, {
+          status: 500,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      }
+    }
+    
+    // 获取可用策略列表
+    if (url.pathname === '/strategies') {
+      try {
+        const strategies = SSQPredictor.getAvailableStrategies();
+        return new Response(JSON.stringify(strategies, null, 2), {
+          headers: { 'Content-Type': 'application/json; charset=utf-8' }
+        });
+      } catch (error) {
+        return new Response(`获取策略失败: ${error.message}`, {
           status: 500,
           headers: { 'Content-Type': 'text/plain; charset=utf-8' }
         });
