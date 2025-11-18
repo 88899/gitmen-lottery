@@ -226,10 +226,10 @@ export default {
       }
     }
     
-    // 初始化数据库（全量爬取模式）
+    // 初始化数据库（批次爬取模式）
     // 用途：首次运行时批量导入历史数据
-    // 逻辑：按年份循环爬取，从 2003 年到当前年份，每年爬取 001-200 期
-    // 特点：与 Python 版本逻辑完全一致，自动去重
+    // 逻辑：每次爬取一年的数据（001-200 期），按年份正序（从 2003 年往后）
+    // 特点：避免 Worker 单次调用限制，可多次执行直到完成，期号越新 ID 越大
     if (url.pathname === '/init' && request.method === 'POST') {
       try {
         const db = new Database(env.DB);
@@ -238,79 +238,137 @@ export default {
         const spider = new SSQSpider();
         
         console.log(`\n========================================`);
-        console.log(`🎯 开始按年份爬取历史数据（与 Python 版本逻辑一致）`);
+        console.log(`🎯 开始按年份爬取历史数据（批次模式）`);
         console.log(`========================================`);
         
         // 双色球从 2003 年开始
         const currentYear = new Date().getFullYear();
         const startYear = 2003;
-        
-        let totalInserted = 0;
-        let totalSkipped = 0;
         const dataSource = '500.com';
         
-        // 按年份循环爬取
+        // 查找数据库中缺失的年份
+        // 策略：从最早年份往后查找，找到第一个缺失数据的年份
+        // 这样期号越新 ID 也越大，数据更有序
+        let targetYear = null;
+        
         for (let year = startYear; year <= currentYear; year++) {
-          const yearShort = year.toString().substring(2); // 2003 -> 03
-          const startIssue = `${yearShort}001`; // 03001
-          const endIssue = `${yearShort}200`;   // 03200
+          const yearShort = year.toString().substring(2);
+          const firstIssue = `20${yearShort}001`; // 7位格式：2003001
           
-          console.log(`\n📅 爬取 ${year} 年数据 (期号: ${startIssue} - ${endIssue})`);
+          // 检查该年份的第一期是否存在
+          const exists = await db.checkExists('ssq', firstIssue);
           
-          try {
-            // 使用 500.com 爬取该年度数据
-            const yearData = await spider.fetch500comByRange(startIssue, endIssue);
-            
-            if (yearData && yearData.length > 0) {
-              console.log(`   ✓ 获取 ${yearData.length} 条数据`);
-              
-              // 批量插入（自动跳过已存在的数据）
-              const result = await db.batchInsert('ssq', yearData);
-              console.log(`   ✓ 入库: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条`);
-              
-              totalInserted += result.inserted;
-              totalSkipped += result.skipped;
-            } else {
-              console.log(`   ⚠ ${year} 年无数据`);
-            }
-            
-            // 每年之间稍作延迟，避免请求过快
-            if (year < currentYear) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-            }
-          } catch (error) {
-            console.error(`   ✗ 爬取 ${year} 年失败: ${error.message}`);
-            // 继续爬取下一年
-            continue;
+          if (!exists) {
+            targetYear = year;
+            break;
           }
         }
         
-        const currentTotal = await db.getCount('ssq');
+        // 如果没有找到缺失的年份，说明数据已完整
+        if (!targetYear) {
+          const currentTotal = await db.getCount('ssq');
+          console.log(`\n========================================`);
+          console.log(`✅ 数据已完整，无需爬取`);
+          console.log(`   当前总计: ${currentTotal} 条`);
+          console.log(`========================================\n`);
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: '数据已完整，所有年份数据已存在',
+              inserted: 0,
+              skipped: 0,
+              total: currentTotal,
+              dataSource: dataSource,
+              note: '历史数据已全部爬取完成'
+            }),
+            {
+              headers: { 'Content-Type': 'application/json; charset=utf-8' }
+            }
+          );
+        }
         
-        console.log(`\n========================================`);
-        console.log(`✅ 全量爬取完成`);
-        console.log(`   新增: ${totalInserted} 条`);
-        console.log(`   跳过: ${totalSkipped} 条`);
-        console.log(`   当前总计: ${currentTotal} 条`);
-        console.log(`========================================\n`);
+        // 爬取目标年份的数据
+        const yearShort = targetYear.toString().substring(2);
+        const startIssue = `${yearShort}001`; // 5位格式：03001
+        const endIssue = `${yearShort}200`;   // 5位格式：03200
         
-        // 注意：初始化不发送 Telegram 通知，只有增量更新和预测才发送
-        console.log('初始化完成，不发送 Telegram 通知');
+        console.log(`\n📅 爬取 ${targetYear} 年数据 (期号: ${startIssue} - ${endIssue})`);
         
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: '全量爬取完成',
-            inserted: totalInserted,
-            skipped: totalSkipped,
-            total: currentTotal,
-            dataSource: dataSource,
-            yearRange: `${startYear}-${currentYear}`
-          }),
-          {
-            headers: { 'Content-Type': 'application/json; charset=utf-8' }
+        try {
+          // 使用 500.com 爬取该年度数据
+          const yearData = await spider.fetch500comByRange(startIssue, endIssue);
+          
+          if (!yearData || yearData.length === 0) {
+            console.log(`   ⚠ ${targetYear} 年无数据`);
+            
+            return new Response(
+              JSON.stringify({
+                success: false,
+                message: `${targetYear} 年无数据`,
+                total: await db.getCount('ssq')
+              }),
+              {
+                headers: { 'Content-Type': 'application/json; charset=utf-8' }
+              }
+            );
           }
-        );
+          
+          console.log(`   ✓ 获取 ${yearData.length} 条数据`);
+          
+          // 批量插入（自动跳过已存在的数据）
+          const result = await db.batchInsert('ssq', yearData);
+          console.log(`   ✓ 入库: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条`);
+          
+          const currentTotal = await db.getCount('ssq');
+          
+          // 检查是否还有更多年份需要爬取
+          let hasMore = false;
+          for (let year = targetYear + 1; year <= currentYear; year++) {
+            const yearShort = year.toString().substring(2);
+            const firstIssue = `20${yearShort}001`;
+            const exists = await db.checkExists('ssq', firstIssue);
+            if (!exists) {
+              hasMore = true;
+              break;
+            }
+          }
+          
+          console.log(`\n========================================`);
+          console.log(`✅ ${targetYear} 年爬取完成`);
+          console.log(`   新增: ${result.inserted} 条`);
+          console.log(`   跳过: ${result.skipped} 条`);
+          console.log(`   当前总计: ${currentTotal} 条`);
+          if (hasMore) {
+            console.log(`   💡 提示: 还有更新年份的数据需要爬取，请继续执行 /init`);
+          } else {
+            console.log(`   🎉 所有历史数据已爬取完成！`);
+          }
+          console.log(`========================================\n`);
+          
+          // 注意：初始化不发送 Telegram 通知，只有增量更新和预测才发送
+          console.log('初始化完成，不发送 Telegram 通知');
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: `${targetYear} 年数据爬取完成`,
+              inserted: result.inserted,
+              skipped: result.skipped,
+              total: currentTotal,
+              dataSource: dataSource,
+              year: targetYear,
+              hasMore: hasMore,
+              note: hasMore ? '还有更新年份的数据需要爬取' : '所有历史数据已爬取完成'
+            }),
+            {
+              headers: { 'Content-Type': 'application/json; charset=utf-8' }
+            }
+          );
+        } catch (error) {
+          console.error(`   ✗ 爬取 ${targetYear} 年失败: ${error.message}`);
+          throw error;
+        }
       } catch (error) {
         console.error('初始化失败:', error);
         return new Response(
