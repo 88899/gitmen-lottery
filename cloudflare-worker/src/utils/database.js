@@ -90,12 +90,16 @@ export class Database {
    * 检查期号是否存在
    */
   async checkExists(table, lotteryNo) {
+    if (!lotteryNo) {
+      return false;
+    }
+
     const result = await this.db
       .prepare(`SELECT COUNT(*) as count FROM ${table}_lottery WHERE lottery_no = ?`)
       .bind(lotteryNo)
       .first();
     
-    return result.count > 0;
+    return result && result.count > 0;
   }
 
   /**
@@ -158,6 +162,12 @@ export class Database {
    * 注意：入库前会按期号从小到大排序，确保 ID 和期号都是递增的
    */
   async batchInsert(table, dataList) {
+    // 检查输入
+    if (!dataList || !Array.isArray(dataList) || dataList.length === 0) {
+      console.log('批量插入: 数据列表为空');
+      return { inserted: 0, skipped: 0 };
+    }
+
     let inserted = 0;
     let skipped = 0;
 
@@ -168,6 +178,13 @@ export class Database {
 
     for (const data of sortedDataList) {
       try {
+        // 验证数据完整性
+        if (!data || !data.lottery_no) {
+          console.error('数据不完整，跳过:', data);
+          skipped++;
+          continue;
+        }
+
         const exists = await this.checkExists(table, data.lottery_no);
         if (!exists) {
           await this.insert(table, data);
@@ -177,6 +194,7 @@ export class Database {
         }
       } catch (error) {
         console.error(`插入数据失败 ${data.lottery_no}:`, error);
+        skipped++;
       }
     }
 
@@ -294,14 +312,26 @@ export class Database {
       const redFreq = {};
       const blueFreq = {};
 
+      // 检查是否有数据
+      if (!results || !results.results || results.results.length === 0) {
+        return {
+          red: {},
+          blue: {}
+        };
+      }
+
       for (const row of results.results) {
         // 统计红球
         for (let i = 1; i <= 6; i++) {
           const ball = row[`red${i}`];
-          redFreq[ball] = (redFreq[ball] || 0) + 1;
+          if (ball) {
+            redFreq[ball] = (redFreq[ball] || 0) + 1;
+          }
         }
         // 统计蓝球
-        blueFreq[row.blue] = (blueFreq[row.blue] || 0) + 1;
+        if (row.blue) {
+          blueFreq[row.blue] = (blueFreq[row.blue] || 0) + 1;
+        }
       }
 
       return {
@@ -316,16 +346,28 @@ export class Database {
       const frontFreq = {};
       const backFreq = {};
 
+      // 检查是否有数据
+      if (!results || !results.results || results.results.length === 0) {
+        return {
+          front: {},
+          back: {}
+        };
+      }
+
       for (const row of results.results) {
         // 统计前区
         for (let i = 1; i <= 5; i++) {
           const ball = row[`front${i}`];
-          frontFreq[ball] = (frontFreq[ball] || 0) + 1;
+          if (ball) {
+            frontFreq[ball] = (frontFreq[ball] || 0) + 1;
+          }
         }
         // 统计后区
         for (let i = 1; i <= 2; i++) {
           const ball = row[`back${i}`];
-          backFreq[ball] = (backFreq[ball] || 0) + 1;
+          if (ball) {
+            backFreq[ball] = (backFreq[ball] || 0) + 1;
+          }
         }
       }
 
@@ -334,6 +376,9 @@ export class Database {
         back: backFreq
       };
     }
+
+    // 未知类型，返回空对象
+    return {};
   }
 
   /**
@@ -355,6 +400,6 @@ export class Database {
       .prepare(`SELECT COUNT(*) as count FROM ${table}_lottery`)
       .first();
 
-    return result.count;
+    return result ? (result.count || 0) : 0;
   }
 }

@@ -221,20 +221,22 @@ async function runDailyTask(env) {
           }
           
           // 预测结果（只显示前3组）
-          message += `🔮 <b>预测下一期（${result.predictions.length} 组）</b>\n`;
-          for (let i = 0; i < Math.min(3, result.predictions.length); i++) {
-            const pred = result.predictions[i];
-            if (result.type === 'ssq') {
-              message += `  ${i + 1}. ${pred.red_balls} + ${pred.blue_ball}\n`;
-            } else {
-              const frontStr = pred.front_balls.map(b => String(b).padStart(2, '0')).join(',');
-              const backStr = pred.back_balls.map(b => String(b).padStart(2, '0')).join(',');
-              message += `  ${i + 1}. ${frontStr} | ${backStr}\n`;
+          if (result.predictions && Array.isArray(result.predictions) && result.predictions.length > 0) {
+            message += `🔮 <b>预测下一期（${result.predictions.length} 组）</b>\n`;
+            for (let i = 0; i < Math.min(3, result.predictions.length); i++) {
+              const pred = result.predictions[i];
+              if (result.type === 'ssq') {
+                message += `  ${i + 1}. ${pred.red_balls} + ${pred.blue_ball}\n`;
+              } else {
+                const frontStr = pred.front_balls.map(b => String(b).padStart(2, '0')).join(',');
+                const backStr = pred.back_balls.map(b => String(b).padStart(2, '0')).join(',');
+                message += `  ${i + 1}. ${frontStr} | ${backStr}\n`;
+              }
             }
-          }
-          
-          if (result.predictions.length > 3) {
-            message += `  ... 还有 ${result.predictions.length - 3} 组\n`;
+            
+            if (result.predictions.length > 3) {
+              message += `  ... 还有 ${result.predictions.length - 3} 组\n`;
+            }
           }
         } else {
           message += `✅ 暂无新数据\n`;
@@ -601,13 +603,21 @@ export default {
         const frequency = await db.getFrequency(type);
         const count = await db.getCount(type);
         
+        // 将频率对象转换为排序后的数组
+        const convertToArray = (freqObj) => {
+          if (!freqObj) return undefined;
+          return Object.entries(freqObj)
+            .map(([ball, count]) => ({ ball: String(ball).padStart(2, '0'), count }))
+            .sort((a, b) => b.count - a.count);
+        };
+        
         const stats = {
           lottery_type: type,
           total_count: count,
-          top_red_balls: frequency.red ? frequency.red.slice(0, 10) : undefined,
-          top_blue_balls: frequency.blue ? frequency.blue.slice(0, 5) : undefined,
-          top_front_balls: frequency.front ? frequency.front.slice(0, 10) : undefined,
-          top_back_balls: frequency.back ? frequency.back.slice(0, 5) : undefined
+          top_red_balls: frequency.red ? convertToArray(frequency.red).slice(0, 10) : undefined,
+          top_blue_balls: frequency.blue ? convertToArray(frequency.blue).slice(0, 5) : undefined,
+          top_front_balls: frequency.front ? convertToArray(frequency.front).slice(0, 10) : undefined,
+          top_back_balls: frequency.back ? convertToArray(frequency.back).slice(0, 5) : undefined
         };
         
         return new Response(JSON.stringify(stats, null, 2), {
