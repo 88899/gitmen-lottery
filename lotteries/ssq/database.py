@@ -92,6 +92,7 @@ class SSQDatabase(BaseDatabase):
     def insert_lottery_data(self, data: List[Dict], skip_existing: bool = True, batch_size: int = 100):
         """
         批量插入中奖数据，使用事务保证数据一致性
+        注意：入库前会按期号从小到大排序，确保 ID 和期号都是递增的
 
         Args:
             data: 中奖数据列表（支持新旧格式）
@@ -110,10 +111,13 @@ class SSQDatabase(BaseDatabase):
         duplicated = 0
         skipped = 0
         
+        # 按期号从小到大排序
+        sorted_data = sorted(data, key=lambda x: x['lottery_no'])
+        
         # 如果启用跳过，先批量查询已存在的期号
         existing_nos = set()
-        if skip_existing and data:
-            lottery_nos = [item['lottery_no'] for item in data]
+        if skip_existing and sorted_data:
+            lottery_nos = [item['lottery_no'] for item in sorted_data]
             cursor = self.connection.cursor()
             try:
                 # 批量查询已存在的期号
@@ -129,7 +133,7 @@ class SSQDatabase(BaseDatabase):
         # 准备批量插入的数据
         batch_data = []
         
-        for item in data:
+        for item in sorted_data:
             try:
                 # 如果已存在，跳过
                 if item['lottery_no'] in existing_nos:

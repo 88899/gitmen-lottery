@@ -98,12 +98,18 @@ export class Database {
 
   /**
    * 批量插入数据
+   * 注意：入库前会按期号从小到大排序，确保 ID 和期号都是递增的
    */
   async batchInsert(table, dataList) {
     let inserted = 0;
     let skipped = 0;
 
-    for (const data of dataList) {
+    // 按期号从小到大排序
+    const sortedDataList = [...dataList].sort((a, b) => {
+      return a.lottery_no.localeCompare(b.lottery_no);
+    });
+
+    for (const data of sortedDataList) {
       try {
         const exists = await this.checkExists(table, data.lottery_no);
         if (!exists) {
