@@ -8,6 +8,7 @@
 
 - ✅ 支持双色球（ssq）
 - ✅ 支持大乐透（dlt）
+- ✅ 支持所有类型（不带参数）
 - ✅ 通过参数指定彩票类型
 - ✅ 自动调用对应的 API 接口
 - ✅ 显示彩票类型和名称
@@ -17,14 +18,12 @@
 ### 基本用法
 
 ```bash
-# 初始化双色球（默认）
-./scripts/init.sh ssq
-
-# 初始化大乐透
-./scripts/init.sh dlt
-
-# 不指定参数，默认为双色球
+# 初始化所有类型（推荐）
 ./scripts/init.sh
+
+# 初始化指定类型
+./scripts/init.sh ssq    # 仅双色球
+./scripts/init.sh dlt    # 仅大乐透
 ```
 
 ### 配置文件

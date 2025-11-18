@@ -34,8 +34,34 @@ if [ "$USE_PROXY" = "true" ]; then
   echo "🔧 使用代理: 127.0.0.1:$PROXY_PORT"
 fi
 
-# 彩票类型（可通过参数指定，默认为 ssq）
-LOTTERY_TYPE=${1:-ssq}
+# 彩票类型（可通过参数指定，不指定则处理所有类型）
+LOTTERY_TYPE=${1:-}
+
+# 如果没有指定类型，处理所有类型
+if [ -z "$LOTTERY_TYPE" ]; then
+  echo ""
+  echo "🚀 初始化所有彩票类型"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  
+  # 初始化双色球
+  echo "📊 开始初始化双色球..."
+  "$0" ssq
+  
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  
+  # 初始化大乐透
+  echo "📊 开始初始化大乐透..."
+  "$0" dlt
+  
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "✅ 所有彩票类型初始化完成！"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  exit 0
+fi
 
 # 验证彩票类型
 if [ "$LOTTERY_TYPE" != "ssq" ] && [ "$LOTTERY_TYPE" != "dlt" ]; then
@@ -43,10 +69,12 @@ if [ "$LOTTERY_TYPE" != "ssq" ] && [ "$LOTTERY_TYPE" != "dlt" ]; then
   echo "💡 支持的类型："
   echo "   ssq - 双色球"
   echo "   dlt - 大乐透"
+  echo "   (空) - 所有类型"
   echo ""
   echo "使用方法："
-  echo "   $0 ssq  # 初始化双色球"
-  echo "   $0 dlt  # 初始化大乐透"
+  echo "   $0       # 初始化所有类型"
+  echo "   $0 ssq   # 仅初始化双色球"
+  echo "   $0 dlt   # 仅初始化大乐透"
   exit 1
 fi
 

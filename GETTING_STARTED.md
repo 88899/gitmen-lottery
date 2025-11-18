@@ -49,6 +49,24 @@ python lottery.py fetch dlt --mode full
 
 # 预测号码
 python lottery.py predict dlt
+
+## 处理所有彩票类型
+
+不带参数时，命令会自动处理所有彩票类型：
+
+```bash
+# 爬取所有类型的全量数据
+python lottery.py fetch --mode full
+
+# 爬取所有类型的最新数据
+python lottery.py fetch --mode latest
+
+# 预测所有类型
+python lottery.py predict
+
+# 定时任务（自动处理所有类型）
+python lottery.py schedule
+```
 ```
 
 ### 配置策略
@@ -103,11 +121,12 @@ wrangler kv:key put --binding=KV_BINDING DEFAULT_PREDICTION_COUNT "15"
 ### 初始化数据
 
 ```bash
-# 双色球
-./scripts/init.sh ssq
+# 所有类型（推荐）
+./scripts/init.sh
 
-# 大乐透
-./scripts/init.sh dlt
+# 指定类型
+./scripts/init.sh ssq    # 仅双色球
+./scripts/init.sh dlt    # 仅大乐透
 ```
 
 ### API 使用
@@ -150,8 +169,10 @@ python lottery.py fetch dlt --mode full    # 爬取全量数据
 python lottery.py fetch dlt --mode latest  # 爬取最新数据
 python lottery.py predict dlt              # 预测号码
 
-# 定时任务（自动处理所有彩票类型）
-python lottery.py schedule                 # 启动定时任务（双色球+大乐透）
+# 所有类型（不带参数）
+python lottery.py fetch --mode full        # 爬取所有类型的全量数据
+python lottery.py predict                  # 预测所有类型
+python lottery.py schedule                 # 定时任务（所有类型）
 ```
 
 ### Worker 版本

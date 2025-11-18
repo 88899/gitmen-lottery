@@ -65,16 +65,14 @@ curl https://your-worker.workers.dev/predict/dlt
 ### Python 版本
 
 ```bash
-# 双色球
-python lottery.py fetch ssq --mode full
-python lottery.py predict ssq
+# 处理所有彩票类型（推荐）
+python lottery.py fetch --mode full    # 爬取所有类型
+python lottery.py predict              # 预测所有类型
+python lottery.py schedule             # 定时任务
 
-# 大乐透
-python lottery.py fetch dlt --mode full
-python lottery.py predict dlt
-
-# 定时任务（自动处理所有彩票类型）
-python lottery.py schedule
+# 处理指定类型
+python lottery.py fetch ssq --mode full    # 仅双色球
+python lottery.py predict dlt              # 仅大乐透
 ```
 
 ### Worker 版本

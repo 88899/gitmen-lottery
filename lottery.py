@@ -21,19 +21,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  # 双色球
-  python lottery.py fetch ssq --mode full     # 爬取全量数据
-  python lottery.py fetch ssq --mode latest   # 爬取最新数据
-  python lottery.py predict ssq               # 预测号码
-  python lottery.py schedule ssq              # 启动定时任务
+  # 处理所有彩票类型（不带参数）
+  python lottery.py fetch --mode full         # 爬取所有类型的全量数据
+  python lottery.py fetch --mode latest       # 爬取所有类型的最新数据
+  python lottery.py predict                   # 预测所有类型
+  python lottery.py schedule                  # 启动定时任务（所有类型）
   
-  # 大乐透
-  python lottery.py fetch dlt --mode full     # 爬取全量数据
-  python lottery.py fetch dlt --mode latest   # 爬取最新数据
-  python lottery.py predict dlt               # 预测号码
-  
-  # 定时任务（自动处理所有彩票类型）
-  python lottery.py schedule                  # 启动定时任务（双色球+大乐透）
+  # 处理指定彩票类型（带参数）
+  python lottery.py fetch ssq --mode full     # 仅爬取双色球全量数据
+  python lottery.py fetch dlt --mode latest   # 仅爬取大乐透最新数据
+  python lottery.py predict ssq               # 仅预测双色球
+  python lottery.py predict dlt               # 仅预测大乐透
 
 支持的彩票类型:
   ssq  - 双色球
@@ -49,8 +47,9 @@ def main():
     fetch_parser = subparsers.add_parser('fetch', help='爬取数据')
     fetch_parser.add_argument(
         'lottery',
+        nargs='?',
         choices=SUPPORTED_LOTTERIES,
-        help='彩票类型'
+        help='彩票类型（可选，不指定则处理所有类型）'
     )
     fetch_parser.add_argument(
         '--mode',
@@ -63,8 +62,9 @@ def main():
     predict_parser = subparsers.add_parser('predict', help='预测号码')
     predict_parser.add_argument(
         'lottery',
+        nargs='?',
         choices=SUPPORTED_LOTTERIES,
-        help='彩票类型'
+        help='彩票类型（可选，不指定则处理所有类型）'
     )
     
     # schedule 命令（不需要指定彩票类型，自动处理所有类型）
@@ -78,13 +78,19 @@ def main():
     
     # 执行命令
     if args.command == 'fetch':
-        if args.mode == 'full':
-            fetch.fetch_full_history(args.lottery)
-        else:
-            fetch.fetch_latest(args.lottery)
+        # 如果没有指定彩票类型，处理所有类型
+        lotteries = [args.lottery] if args.lottery else ['ssq', 'dlt']
+        for lottery in lotteries:
+            if args.mode == 'full':
+                fetch.fetch_full_history(lottery)
+            else:
+                fetch.fetch_latest(lottery)
     
     elif args.command == 'predict':
-        predict.predict(args.lottery)
+        # 如果没有指定彩票类型，处理所有类型
+        lotteries = [args.lottery] if args.lottery else ['ssq', 'dlt']
+        for lottery in lotteries:
+            predict.predict(lottery)
     
     elif args.command == 'schedule':
         schedule.start_schedule()

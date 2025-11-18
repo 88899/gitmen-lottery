@@ -319,8 +319,8 @@ export default {
     }
     
     // 验证授权（需要 API_KEY 的接口）
-    const requireAuth = ['/init', '/run'];
-    if (requireAuth.includes(url.pathname)) {
+    const requireAuth = url.pathname.startsWith('/init') || url.pathname.startsWith('/run');
+    if (requireAuth) {
       const authHeader = request.headers.get('Authorization');
       if (!authHeader || authHeader !== `Bearer ${config.apiKey}`) {
         return new Response('Unauthorized', { status: 401 });
@@ -331,20 +331,23 @@ export default {
     // 用途：首次运行时批量导入历史数据
     // 逻辑：每次爬取一年的数据（001-200 期），按年份正序（从 2003 年往后）
     // 特点：避免 Worker 单次调用限制，可多次执行直到完成，期号越新 ID 越大
-    if (url.pathname === '/init' && request.method === 'POST') {
+    if (url.pathname.startsWith('/init') && request.method === 'POST') {
+      // 提取彩票类型：/init/ssq 或 /init/dlt，默认 ssq
+      const type = extractLotteryType(url.pathname) || 'ssq';
       try {
+        const modules = getLotteryModules(type);
         const db = new Database(env.DB);
         await db.init();
         
-        const spider = new SSQSpider();
+        const spider = new modules.spider();
         
         console.log(`\n========================================`);
-        console.log(`🎯 开始按年份爬取历史数据（批次模式）`);
+        console.log(`🎯 开始按年份爬取 ${modules.name} 历史数据（批次模式）`);
         console.log(`========================================`);
         
-        // 双色球从 2003 年开始
+        // 获取起始年份
         const currentYear = new Date().getFullYear();
-        const startYear = 2003;
+        const startYear = modules.startYear;
         const dataSource = '500.com';
         
         // 查找数据库中缺失的年份
@@ -357,7 +360,7 @@ export default {
           const firstIssue = `20${yearShort}001`; // 7位格式：2003001
           
           // 检查该年份的第一期是否存在
-          const exists = await db.checkExists('ssq', firstIssue);
+          const exists = await db.checkExists(type, firstIssue);
           
           if (!exists) {
             targetYear = year;
@@ -367,20 +370,21 @@ export default {
         
         // 如果没有找到缺失的年份，说明数据已完整
         if (!targetYear) {
-          const currentTotal = await db.getCount('ssq');
+          const currentTotal = await db.getCount(type);
           console.log(`\n========================================`);
-          console.log(`✅ 数据已完整，无需爬取`);
+          console.log(`✅ ${modules.name} 数据已完整，无需爬取`);
           console.log(`   当前总计: ${currentTotal} 条`);
           console.log(`========================================\n`);
           
           return new Response(
             JSON.stringify({
               success: true,
-              message: '数据已完整，所有年份数据已存在',
+              message: `${modules.name} 数据已完整，所有年份数据已存在`,
               inserted: 0,
               skipped: 0,
               total: currentTotal,
               dataSource: dataSource,
+              lotteryType: type,
               note: '历史数据已全部爬取完成'
             }),
             {
@@ -406,8 +410,9 @@ export default {
             return new Response(
               JSON.stringify({
                 success: false,
-                message: `${targetYear} 年无数据`,
-                total: await db.getCount('ssq')
+                message: `${modules.name} ${targetYear} 年无数据`,
+                total: await db.getCount(type),
+                lotteryType: type
               }),
               {
                 headers: { 'Content-Type': 'application/json; charset=utf-8' }
@@ -418,17 +423,17 @@ export default {
           console.log(`   ✓ 获取 ${yearData.length} 条数据`);
           
           // 批量插入（自动跳过已存在的数据）
-          const result = await db.batchInsert('ssq', yearData);
+          const result = await db.batchInsert(type, yearData);
           console.log(`   ✓ 入库: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条`);
           
-          const currentTotal = await db.getCount('ssq');
+          const currentTotal = await db.getCount(type);
           
           // 检查是否还有更多年份需要爬取
           let hasMore = false;
           for (let year = targetYear + 1; year <= currentYear; year++) {
             const yearShort = year.toString().substring(2);
             const firstIssue = `20${yearShort}001`;
-            const exists = await db.checkExists('ssq', firstIssue);
+            const exists = await db.checkExists(type, firstIssue);
             if (!exists) {
               hasMore = true;
               break;
@@ -436,14 +441,14 @@ export default {
           }
           
           console.log(`\n========================================`);
-          console.log(`✅ ${targetYear} 年爬取完成`);
+          console.log(`✅ ${modules.name} ${targetYear} 年爬取完成`);
           console.log(`   新增: ${result.inserted} 条`);
           console.log(`   跳过: ${result.skipped} 条`);
           console.log(`   当前总计: ${currentTotal} 条`);
           if (hasMore) {
-            console.log(`   💡 提示: 还有更新年份的数据需要爬取，请继续执行 /init`);
+            console.log(`   💡 提示: 还有更新年份的数据需要爬取，请继续执行 /init/${type}`);
           } else {
-            console.log(`   🎉 所有历史数据已爬取完成！`);
+            console.log(`   🎉 ${modules.name} 所有历史数据已爬取完成！`);
           }
           console.log(`========================================\n`);
           
@@ -453,18 +458,19 @@ export default {
           return new Response(
             JSON.stringify({
               success: true,
-              message: `${targetYear} 年数据爬取完成`,
+              message: `${modules.name} ${targetYear} 年数据爬取完成`,
               inserted: result.inserted,
               skipped: result.skipped,
               total: currentTotal,
               dataSource: dataSource,
+              lotteryType: type,
               queryParams: {
                 start: startIssue,
                 end: endIssue
               },
               year: targetYear,
               hasMore: hasMore,
-              note: hasMore ? '还有更新年份的数据需要爬取' : '所有历史数据已爬取完成'
+              note: hasMore ? '还有更新年份的数据需要爬取' : `${modules.name} 所有历史数据已爬取完成`
             }),
             {
               headers: { 'Content-Type': 'application/json; charset=utf-8' }
@@ -490,7 +496,7 @@ export default {
     }
     
     // 手动执行每日任务
-    if (url.pathname === '/run' && request.method === 'POST') {
+    if (url.pathname.startsWith('/run') && request.method === 'POST') {
       try {
         const result = await runDailyTask(env);
         return new Response(JSON.stringify(result, null, 2), {
@@ -508,10 +514,11 @@ export default {
     }
     
     // 查询最新数据
-    if (url.pathname === '/latest') {
+    if (url.pathname.startsWith('/latest')) {
       try {
+        const type = extractLotteryType(url.pathname);
         const db = new Database(env.DB);
-        const latest = await db.getLatest('ssq');
+        const latest = await db.getLatest(type);
         
         if (!latest) {
           return new Response('暂无数据', {
@@ -532,8 +539,10 @@ export default {
     }
     
     // 预测
-    if (url.pathname === '/predict') {
+    if (url.pathname.startsWith('/predict')) {
       try {
+        const type = extractLotteryType(url.pathname);
+        const modules = getLotteryModules(type);
         const db = new Database(env.DB);
         
         // 获取参数
@@ -553,7 +562,7 @@ export default {
           strategies = config.defaultStrategies.split(',').map(s => s.trim());
         }
         
-        const predictor = new SSQPredictor(db);
+        const predictor = new modules.predictor(db);
         const predictions = await predictor.predict(count, strategies);
         
         return new Response(JSON.stringify(predictions, null, 2), {
@@ -568,9 +577,11 @@ export default {
     }
     
     // 获取可用策略列表
-    if (url.pathname === '/strategies') {
+    if (url.pathname.startsWith('/strategies')) {
       try {
-        const strategies = SSQPredictor.getAvailableStrategies();
+        const type = extractLotteryType(url.pathname);
+        const modules = getLotteryModules(type);
+        const strategies = modules.predictor.getAvailableStrategies();
         return new Response(JSON.stringify(strategies, null, 2), {
           headers: { 'Content-Type': 'application/json; charset=utf-8' }
         });
@@ -583,16 +594,20 @@ export default {
     }
     
     // 统计信息
-    if (url.pathname === '/stats') {
+    if (url.pathname.startsWith('/stats')) {
       try {
+        const type = extractLotteryType(url.pathname);
         const db = new Database(env.DB);
-        const frequency = await db.getFrequency('ssq');
-        const count = await db.getCount('ssq');
+        const frequency = await db.getFrequency(type);
+        const count = await db.getCount(type);
         
         const stats = {
+          lottery_type: type,
           total_count: count,
-          top_red_balls: frequency.red.slice(0, 10),
-          top_blue_balls: frequency.blue.slice(0, 5)
+          top_red_balls: frequency.red ? frequency.red.slice(0, 10) : undefined,
+          top_blue_balls: frequency.blue ? frequency.blue.slice(0, 5) : undefined,
+          top_front_balls: frequency.front ? frequency.front.slice(0, 10) : undefined,
+          top_back_balls: frequency.back ? frequency.back.slice(0, 5) : undefined
         };
         
         return new Response(JSON.stringify(stats, null, 2), {

@@ -9,14 +9,16 @@
 **支持**：
 - ✅ 双色球（ssq）
 - ✅ 大乐透（dlt）
+- ✅ 所有类型（不带参数）
 
 **使用**：
 ```bash
-# 双色球
-./scripts/init.sh ssq
+# 所有类型（推荐）
+./scripts/init.sh
 
-# 大乐透
-./scripts/init.sh dlt
+# 指定类型
+./scripts/init.sh ssq    # 仅双色球
+./scripts/init.sh dlt    # 仅大乐透
 ```
 
 **文档**：[INIT_USAGE.md](./INIT_USAGE.md)
@@ -104,17 +106,12 @@
 cp ../.env.example ../.env
 vim ../.env
 
-# 2. 初始化双色球
-./init.sh ssq
+# 2. 初始化所有类型（推荐）
+./init.sh
 
-# 3. 初始化大乐透
-./init.sh dlt
-
-# 4. 测试增量爬取（待更新）
-# ./test-incremental.sh dlt
-
-# 5. 诊断（待更新）
-# ./diagnose.sh dlt
+# 或者分别初始化
+./init.sh ssq    # 仅双色球
+./init.sh dlt    # 仅大乐透
 ```
 
 ### 配置文件

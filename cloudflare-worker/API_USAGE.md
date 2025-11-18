@@ -32,6 +32,11 @@ curl https://your-worker.workers.dev/predict/dlt
 
 ## 📖 API 接口
 
+### 接口设计说明
+
+- **批量操作接口**（`/init`、`/run`）：建议使用脚本或手动触发，通过脚本可以处理所有类型
+- **查询接口**（`/latest`、`/predict`、`/stats`）：支持指定类型，不指定时默认返回双色球（向后兼容）
+
 ### 1. 初始化数据库
 
 **接口**：`POST /init/{type}`
@@ -43,7 +48,17 @@ curl https://your-worker.workers.dev/predict/dlt
 
 **认证**：需要 API Key
 
-**示例**：
+**推荐方式**（使用脚本）：
+```bash
+# 初始化所有类型
+./scripts/init.sh
+
+# 或指定类型
+./scripts/init.sh ssq
+./scripts/init.sh dlt
+```
+
+**直接调用 API**：
 ```bash
 # 双色球
 curl -X POST https://your-worker.workers.dev/init/ssq \
@@ -75,23 +90,15 @@ curl -X POST https://your-worker.workers.dev/init/dlt \
 
 ### 2. 手动执行每日任务
 
-**接口**：`POST /run/{type}`
+**接口**：`POST /run`
 
-**说明**：手动触发每日任务（爬取最新数据并预测）
-
-**参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`）
+**说明**：手动触发每日任务（同时处理所有彩票类型：爬取最新数据并预测）
 
 **认证**：需要 API Key
 
 **示例**：
 ```bash
-# 双色球
-curl -X POST https://your-worker.workers.dev/run/ssq \
-  -H "Authorization: Bearer YOUR_API_KEY"
-
-# 大乐透
-curl -X POST https://your-worker.workers.dev/run/dlt \
+curl -X POST https://your-worker.workers.dev/run \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -99,13 +106,30 @@ curl -X POST https://your-worker.workers.dev/run/dlt \
 ```json
 {
   "success": true,
-  "message": "增量更新完成",
-  "mode": "incremental",
-  "new_count": 1,
-  "lottery_no": "2025131",
-  "draw_date": "2025-11-17"
+  "message": "每日任务执行完成",
+  "results": [
+    {
+      "type": "ssq",
+      "name": "双色球",
+      "success": true,
+      "hasNewData": true,
+      "latest": { ... },
+      "predictions": [ ... ]
+    },
+    {
+      "type": "dlt",
+      "name": "大乐透",
+      "success": true,
+      "hasNewData": false
+    }
+  ]
 }
 ```
+
+**说明**：
+- 同时处理双色球和大乐透
+- 如有新数据则自动入库并预测
+- 发送综合的 Telegram 通知
 
 ### 3. 查询最新数据
 
@@ -114,7 +138,7 @@ curl -X POST https://your-worker.workers.dev/run/dlt \
 **说明**：查询最新一期开奖数据
 
 **参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`）
+- `{type}`：彩票类型（`ssq` 或 `dlt`），可选，默认 `ssq`
 
 **认证**：无需认证
 
@@ -122,6 +146,7 @@ curl -X POST https://your-worker.workers.dev/run/dlt \
 ```bash
 # 双色球
 curl https://your-worker.workers.dev/latest/ssq
+curl https://your-worker.workers.dev/latest    # 默认双色球
 
 # 大乐透
 curl https://your-worker.workers.dev/latest/dlt
@@ -156,9 +181,9 @@ curl https://your-worker.workers.dev/latest/dlt
 **说明**：获取预测号码
 
 **参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`）
-- `count`：预测条数（可选，默认 5）
-- `strategies`：策略列表（可选，默认 frequency）
+- `{type}`：彩票类型（`ssq` 或 `dlt`），可选，默认 `ssq`
+- `count`：预测条数（可选，默认使用 KV 配置的值）
+- `strategies`：策略列表（可选，默认使用 KV 配置的值）
 
 **认证**：无需认证
 
@@ -166,6 +191,7 @@ curl https://your-worker.workers.dev/latest/dlt
 ```bash
 # 双色球 - 使用默认配置
 curl https://your-worker.workers.dev/predict/ssq
+curl https://your-worker.workers.dev/predict    # 默认双色球
 
 # 双色球 - 自定义参数
 curl "https://your-worker.workers.dev/predict/ssq?count=10&strategies=frequency,balanced"
@@ -232,7 +258,7 @@ curl "https://your-worker.workers.dev/predict/dlt?count=15&strategies=frequency,
 **说明**：查看可用的预测策略
 
 **参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`）
+- `{type}`：彩票类型（`ssq` 或 `dlt`），可选，默认 `ssq`
 
 **认证**：无需认证
 
@@ -240,6 +266,7 @@ curl "https://your-worker.workers.dev/predict/dlt?count=15&strategies=frequency,
 ```bash
 # 双色球
 curl https://your-worker.workers.dev/strategies/ssq
+curl https://your-worker.workers.dev/strategies    # 默认双色球
 
 # 大乐透
 curl https://your-worker.workers.dev/strategies/dlt
@@ -278,7 +305,7 @@ curl https://your-worker.workers.dev/strategies/dlt
 **说明**：查看号码频率统计
 
 **参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`）
+- `{type}`：彩票类型（`ssq` 或 `dlt`），可选，默认 `ssq`
 
 **认证**：无需认证
 
@@ -286,6 +313,7 @@ curl https://your-worker.workers.dev/strategies/dlt
 ```bash
 # 双色球
 curl https://your-worker.workers.dev/stats/ssq
+curl https://your-worker.workers.dev/stats    # 默认双色球
 
 # 大乐透
 curl https://your-worker.workers.dev/stats/dlt

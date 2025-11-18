@@ -39,11 +39,12 @@ wrangler kv:key put --binding=KV_BINDING DEFAULT_PREDICTION_COUNT "15"
 ### 3. 初始化数据
 
 ```bash
-# 双色球
-./scripts/init.sh ssq
+# 所有类型（推荐）
+./scripts/init.sh
 
-# 大乐透
-./scripts/init.sh dlt
+# 或指定类型
+./scripts/init.sh ssq    # 仅双色球
+./scripts/init.sh dlt    # 仅大乐透
 ```
 
 ## API 接口
