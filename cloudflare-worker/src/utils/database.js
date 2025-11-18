@@ -145,13 +145,13 @@ export class Database {
   }
 
   /**
-   * 获取最旧数据
+   * 获取最旧数据（按开奖日期排序，而不是期号）
    */
   async getOldest(table) {
     const result = await this.db
       .prepare(`
         SELECT * FROM ${table}_lottery 
-        ORDER BY lottery_no ASC 
+        ORDER BY draw_date ASC, lottery_no ASC 
         LIMIT 1
       `)
       .first();

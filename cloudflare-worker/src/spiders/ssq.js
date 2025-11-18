@@ -438,6 +438,39 @@ export class SSQSpider {
   }
 
   /**
+   * 从 500.com 按期号范围获取数据（与 Python 版本一致）
+   * @param {string} startIssue - 开始期号（5位格式，如 '03001'）
+   * @param {string} endIssue - 结束期号（5位格式，如 '03200'）
+   */
+  async fetch500comByRange(startIssue, endIssue) {
+    await this.randomDelay();
+    
+    const url = `${this.backup500Url}?start=${startIssue}&end=${endIssue}`;
+    
+    console.log(`      📊 数据源: 500.com`);
+    console.log(`      🔗 查询: start=${startIssue}, end=${endIssue}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': this.headers['User-Agent'],
+        'Referer': 'https://www.500.com/',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    
+    // 解析 HTML
+    const data = this.parse500Html(html);
+    
+    return data;
+  }
+
+  /**
    * 从 500.com 获取数据（备用）
    * 支持按期号范围查询，每次获取 200 期（与 Python 版本一致）
    * @param {number} batchSize - 每批次获取的期数（默认 200）

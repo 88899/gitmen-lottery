@@ -228,7 +228,8 @@ export default {
     
     // 初始化数据库（全量爬取模式）
     // 用途：首次运行时批量导入历史数据
-    // 特点：每次爬取固定数量，从数据库最旧的期号往前爬，自动去重
+    // 逻辑：按年份循环爬取，从 2003 年到当前年份，每年爬取 001-200 期
+    // 特点：与 Python 版本逻辑完全一致，自动去重
     if (url.pathname === '/init' && request.method === 'POST') {
       try {
         const db = new Database(env.DB);
@@ -236,144 +237,62 @@ export default {
         
         const spider = new SSQSpider();
         
-        // 获取数据库中最旧的记录
-        const oldest = await db.getOldest('ssq');
-        let allData = [];
-        
-        // 使用 500.com 作为主数据源（已验证可用）
         console.log(`\n========================================`);
-        console.log(`🎯 开始爬取数据`);
+        console.log(`🎯 开始按年份爬取历史数据（与 Python 版本逻辑一致）`);
         console.log(`========================================`);
         
-        let dataSource = '500.com';
-        let queryParams = {};
+        // 双色球从 2003 年开始
+        const currentYear = new Date().getFullYear();
+        const startYear = 2003;
         
-        try {
-          if (oldest) {
-            console.log(`📦 数据库状态: 有数据`);
-            console.log(`📌 最旧记录: ${oldest.lottery_no} (${oldest.draw_date})`);
+        let totalInserted = 0;
+        let totalSkipped = 0;
+        const dataSource = '500.com';
+        
+        // 按年份循环爬取
+        for (let year = startYear; year <= currentYear; year++) {
+          const yearShort = year.toString().substring(2); // 2003 -> 03
+          const startIssue = `${yearShort}001`; // 03001
+          const endIssue = `${yearShort}200`;   // 03200
+          
+          console.log(`\n📅 爬取 ${year} 年数据 (期号: ${startIssue} - ${endIssue})`);
+          
+          try {
+            // 使用 500.com 爬取该年度数据
+            const yearData = await spider.fetch500comByRange(startIssue, endIssue);
             
-            const year = parseInt(oldest.lottery_no.substring(0, 4));
-            const yearPrefix = oldest.lottery_no.substring(2, 4);
-            const issueNum = parseInt(oldest.lottery_no.substring(4));
-            
-            let endNum = issueNum - 1;
-            let endYearPrefix = yearPrefix;
-            
-            if (endNum < 1) {
-              const endYear = year - 1;
-              endYearPrefix = endYear.toString().substring(2);
-              endNum = 153;
-            }
-            
-            const endIssue = endYearPrefix + endNum.toString().padStart(3, '0');
-            const startNum = Math.max(1, endNum - 199);  // 改为 200 期（0-199 = 200个）
-            const startIssue = endYearPrefix + startNum.toString().padStart(3, '0');
-            
-            queryParams = { start: startIssue, end: endIssue };
-            
-            console.log(`🎲 策略: 从期号 ${startIssue} 至 ${endIssue}`);
-            console.log(`========================================\n`);
-            
-            allData = await spider.fetchAllFrom500(200, oldest.lottery_no);  // 改为 200 期
-            
-            // 检查返回值是否为有效数组
-            if (!Array.isArray(allData)) {
-              console.log(`\n========================================`);
-              console.log(`❌ 爬取失败: 返回值不是数组`);
-              console.log(`   数据源: ${dataSource}`);
-              console.log(`   查询参数: start=${queryParams.start}, end=${queryParams.end}`);
-              console.log(`   返回值:`, JSON.stringify(allData));
-              console.log(`========================================\n`);
+            if (yearData && yearData.length > 0) {
+              console.log(`   ✓ 获取 ${yearData.length} 条数据`);
               
-              // 返回错误信息并终止
-              return new Response(
-                JSON.stringify({
-                  success: false,
-                  message: allData.message || '未获取到数据',
-                  source: allData.source || dataSource,
-                  params: allData.params || queryParams,
-                  total: await db.getCount('ssq')
-                }),
-                {
-                  headers: { 'Content-Type': 'application/json; charset=utf-8' }
-                }
-              );
-            }
-            
-            console.log(`\n========================================`);
-            console.log(`✅ 爬取完成: 获取到 ${allData.length} 条数据`);
-            console.log(`   数据源: ${dataSource}`);
-            console.log(`   查询参数: start=${queryParams.start}, end=${queryParams.end}`);
-            console.log(`========================================\n`);
-          } else {
-            console.log(`📦 数据库状态: 空`);
-            console.log(`🎲 策略: 获取最新 200 期`);
-            console.log(`========================================\n`);
-            
-            allData = await spider.fetchAllFrom500(200);  // 改为 200 期
-            
-            // 检查返回值是否为有效数组
-            if (!Array.isArray(allData)) {
-              console.log(`\n========================================`);
-              console.log(`❌ 爬取失败: 返回值不是数组`);
-              console.log(`   数据源: ${dataSource}`);
-              console.log(`   返回值:`, JSON.stringify(allData));
-              console.log(`========================================\n`);
+              // 批量插入（自动跳过已存在的数据）
+              const result = await db.batchInsert('ssq', yearData);
+              console.log(`   ✓ 入库: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条`);
               
-              // 返回错误信息并终止
-              return new Response(
-                JSON.stringify({
-                  success: false,
-                  message: allData.message || '未获取到数据',
-                  source: allData.source || dataSource,
-                  params: allData.params || {},
-                  total: await db.getCount('ssq')
-                }),
-                {
-                  headers: { 'Content-Type': 'application/json; charset=utf-8' }
-                }
-              );
+              totalInserted += result.inserted;
+              totalSkipped += result.skipped;
+            } else {
+              console.log(`   ⚠ ${year} 年无数据`);
             }
             
-            if (allData.length > 0) {
-              const firstIssue = allData[0].lottery_no.substring(2);
-              const lastIssue = allData[allData.length - 1].lottery_no.substring(2);
-              queryParams = { start: lastIssue, end: firstIssue };
+            // 每年之间稍作延迟，避免请求过快
+            if (year < currentYear) {
+              await new Promise(resolve => setTimeout(resolve, 500));
             }
-            
-            console.log(`\n========================================`);
-            console.log(`✅ 爬取完成: 获取到 ${allData.length} 条数据`);
-            console.log(`   数据源: ${dataSource}`);
-            console.log(`   查询参数: start=${queryParams.start || '未知'}, end=${queryParams.end || '未知'}`);
-            console.log(`========================================\n`);
+          } catch (error) {
+            console.error(`   ✗ 爬取 ${year} 年失败: ${error.message}`);
+            // 继续爬取下一年
+            continue;
           }
-        } catch (error) {
-          console.error(`\n❌ 爬取失败: ${error.message}`);
-          console.error(`   数据源: ${dataSource}`);
-          console.error(`   查询参数: start=${queryParams.start || '未知'}, end=${queryParams.end || '未知'}`);
-          console.error(`   错误堆栈: ${error.stack}`);
-          allData = [];
         }
         
-        if (allData.length === 0) {
-          return new Response(
-            JSON.stringify({
-              success: false,
-              message: '未获取到数据',
-              total: await db.getCount('ssq')
-            }),
-            {
-              headers: { 'Content-Type': 'application/json; charset=utf-8' }
-            }
-          );
-        }
-        
-        // 批量插入（存在的自动跳过）
-        const result = await db.batchInsert('ssq', allData);
         const currentTotal = await db.getCount('ssq');
         
-        console.log(`插入完成: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条，当前总计 ${currentTotal} 条`);
+        console.log(`\n========================================`);
+        console.log(`✅ 全量爬取完成`);
+        console.log(`   新增: ${totalInserted} 条`);
+        console.log(`   跳过: ${totalSkipped} 条`);
+        console.log(`   当前总计: ${currentTotal} 条`);
+        console.log(`========================================\n`);
         
         // 注意：初始化不发送 Telegram 通知，只有增量更新和预测才发送
         console.log('初始化完成，不发送 Telegram 通知');
@@ -381,12 +300,12 @@ export default {
         return new Response(
           JSON.stringify({
             success: true,
-            message: '批量导入完成',
-            inserted: result.inserted,
-            skipped: result.skipped,
+            message: '全量爬取完成',
+            inserted: totalInserted,
+            skipped: totalSkipped,
             total: currentTotal,
             dataSource: dataSource,
-            queryParams: queryParams
+            yearRange: `${startYear}-${currentYear}`
           }),
           {
             headers: { 'Content-Type': 'application/json; charset=utf-8' }
