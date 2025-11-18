@@ -357,6 +357,10 @@ export default {
               skipped: result.skipped,
               total: currentTotal,
               dataSource: dataSource,
+              queryParams: {
+                start: startIssue,
+                end: endIssue
+              },
               year: targetYear,
               hasMore: hasMore,
               note: hasMore ? '还有更新年份的数据需要爬取' : '所有历史数据已爬取完成'
