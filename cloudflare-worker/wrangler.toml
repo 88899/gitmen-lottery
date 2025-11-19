@@ -42,3 +42,6 @@ crons = ["00 14 * * *"]
 #    - TELEGRAM_CHAT_ID
 #    - API_KEY
 
+[[routes]]
+pattern = "cp.gitman.netlib.re"
+custom_domain = true
