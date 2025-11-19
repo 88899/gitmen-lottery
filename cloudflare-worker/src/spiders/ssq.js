@@ -48,6 +48,10 @@ export class SSQSpider {
       });
 
       if (!response.ok) {
+        // 发送网络错误通知
+        if (typeof handleNetworkError !== 'undefined') {
+          await handleNetworkError(globalThis.env, response.status, this.baseUrl, 'ssq');
+        }
         throw new Error(`HTTP ${response.status}`);
       }
 
@@ -73,6 +77,10 @@ export class SSQSpider {
     });
 
     if (!response.ok) {
+      // 发送网络错误通知
+      if (typeof handleNetworkError !== 'undefined') {
+        await handleNetworkError(globalThis.env, response.status, url, 'ssq');
+      }
       throw new Error(`HTTP ${response.status}`);
     }
 

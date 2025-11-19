@@ -10,6 +10,10 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent))
 
+# 设置全局异常处理
+from core.error_handler import setup_global_exception_handler
+setup_global_exception_handler()
+
 from core.config import SUPPORTED_LOTTERIES, LOTTERY_NAMES
 from cli import fetch, predict, schedule
 

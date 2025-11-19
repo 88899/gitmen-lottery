@@ -8,6 +8,7 @@ import { DLTSpider } from './spiders/dlt.js';
 import { DLTPredictor } from './predictors/dlt.js';
 import { TelegramBot } from './utils/telegram.js';
 import { Database } from './utils/database.js';
+import { handleNetworkError, handleParseError, handleCriticalError, withErrorHandling } from './utils/error-handler.js';
 
 /**
  * 从 KV 获取配置
@@ -451,6 +452,10 @@ export default {
    * HTTP 请求处理器
    */
   async fetch(request, env, ctx) {
+    // 设置全局环境变量，供错误处理使用
+    globalThis.env = env;
+    
+    try {
     const url = new URL(request.url);
     const config = await getConfig(env);
     
@@ -881,6 +886,28 @@ export default {
     }
     
     return new Response('Not Found', { status: 404 });
+    
+    } catch (error) {
+      // 全局错误处理
+      console.error('全局错误:', error);
+      
+      // 发送严重错误通知
+      try {
+        await handleCriticalError(
+          env,
+          'UNHANDLED_EXCEPTION',
+          `${error.name}: ${error.message}`,
+          {
+            stack: error.stack?.substring(0, 500),
+            url: request.url
+          }
+        );
+      } catch (notifyError) {
+        console.error('发送错误通知失败:', notifyError);
+      }
+      
+      return new Response('Internal Server Error', { status: 500 });
+    }
   },
 
   /**

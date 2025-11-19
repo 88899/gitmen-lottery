@@ -14,6 +14,7 @@ import logging
 from typing import List, Dict
 import time
 import re
+from core.error_handler import handle_network_error, handle_parse_error
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,15 @@ class SSQSpider:
             logger.info(f"成功获取 {len(data)} 条数据")
             return data
             
+        except requests.exceptions.RequestException as e:
+            # 网络错误，发送通知
+            error_code = getattr(e.response, 'status_code', 'UNKNOWN') if hasattr(e, 'response') and e.response else 'NETWORK'
+            handle_network_error(str(error_code), url, 'ssq')
+            logger.error(f"网络请求失败: {e}")
+            return []
         except Exception as e:
+            # 其他错误，发送通知
+            handle_parse_error(f"数据获取失败: {str(e)}", 'ssq', '500.com')
             logger.error(f"获取数据失败: {e}")
             return []
     
@@ -104,7 +113,15 @@ class SSQSpider:
             
             return self._parse_html(response.text)
             
+        except requests.exceptions.RequestException as e:
+            # 网络错误，发送通知
+            error_code = getattr(e.response, 'status_code', 'UNKNOWN') if hasattr(e, 'response') and e.response else 'NETWORK'
+            handle_network_error(str(error_code), self.BASE_URL, 'ssq')
+            logger.error(f"从 500.com 网络请求失败: {e}")
+            return []
         except Exception as e:
+            # 其他错误，发送通知
+            handle_parse_error(f"从 500.com 获取数据失败: {str(e)}", 'ssq', '500.com')
             logger.error(f"从 500.com 获取数据失败: {e}")
             return []
 

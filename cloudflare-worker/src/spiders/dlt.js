@@ -47,6 +47,10 @@ export class DLTSpider {
       });
 
       if (!response.ok) {
+        // 发送网络错误通知
+        if (typeof handleNetworkError !== 'undefined') {
+          await handleNetworkError(globalThis.env, response.status, this.baseUrl, 'dlt');
+        }
         throw new Error(`HTTP ${response.status}`);
       }
 
@@ -72,6 +76,10 @@ export class DLTSpider {
     });
 
     if (!response.ok) {
+      // 发送网络错误通知
+      if (typeof handleNetworkError !== 'undefined') {
+        await handleNetworkError(globalThis.env, response.status, url, 'dlt');
+      }
       throw new Error(`HTTP ${response.status}`);
     }
 
