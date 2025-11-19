@@ -8,7 +8,7 @@ import { DLTSpider } from './spiders/dlt.js';
 import { DLTPredictor } from './predictors/dlt.js';
 import { TelegramBot } from './utils/telegram.js';
 import { Database } from './utils/database.js';
-import { handleNetworkError, handleParseError, handleCriticalError, withErrorHandling } from './utils/error-handler.js';
+import { handleNetworkError, handleParseError, handleCriticalError } from './utils/error-handler.js';
 
 /**
  * 从 KV 获取配置
@@ -357,18 +357,13 @@ async function runDailyTask(env) {
       };
     }
     
-    // 构建综合消息（总是发送通知，包含预测结果）
-    const results = [ssqResult, dltResult].filter(r => r.success);
-    const hasNewData = results.some(r => r.hasNewData);
-    const hasPredictions = results.some(r => r.predictions && r.predictions.length > 0);
-    
     // 总是发送 Telegram 通知（无论是否有新数据，只要处理成功就发送）
-    // 为每个彩票类型单独发送消息，避免消息过长被截断
-    for (const result of results) {
+    const results = [ssqResult, dltResult].filter(r => r.success);
+    // 构建所有消息
+    const messages = results.map(result => {
       // 检查是否有预测结果
       if (!result.predictions || result.predictions.length === 0) {
         console.warn(`${result.name} 无预测结果，但仍然发送通知`);
-        // 不要 continue，继续发送通知（即使没有预测结果）
       }
       
       // 构建单个彩票类型的消息（简洁格式）
@@ -402,11 +397,18 @@ async function runDailyTask(env) {
       message += `━━━━━━━━━━━━━━━\n`;
       message += `⚠️ 仅供参考，理性购彩`;
       
-      // 总是发送消息（即使没有预测结果）
-      console.log(`\n发送 ${result.name} Telegram 通知...`);
-      await telegram.sendMessage(message);
-      console.log(`✓ ${result.name} Telegram 通知已发送`);
-    }
+      return { name: result.name, content: message };
+    });
+    
+    // 并行发送所有消息（优化：减少等待时间）
+    console.log(`\n准备发送 ${messages.length} 条 Telegram 通知...`);
+    await Promise.all(
+      messages.map(msg => 
+        telegram.sendMessage(msg.content)
+          .then(() => console.log(`✓ ${msg.name} Telegram 通知已发送`))
+          .catch(err => console.error(`✗ ${msg.name} Telegram 通知发送失败:`, err))
+      )
+    );
     
     console.log('✅ 每日任务执行完成');
     
