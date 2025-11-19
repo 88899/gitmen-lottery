@@ -515,23 +515,33 @@ export default {
           // 网站API返回空数据，需要判断是否应该跨年
           const currentTotal = await db.getCount(type);
           
-          // 检查当前批次是否到了年底
+          // 检查当前批次是否需要跨年
           const currentYear = parseInt(startIssue.substring(0, 2));
           const currentIssueNum = parseInt(startIssue.substring(2));
           const endIssueNum = parseInt(endIssue.substring(2));
-          const isEndOfYear = endIssueNum >= 200 || (currentIssueNum > 150 && endIssueNum >= 190);
+          
+          // 跨年判断逻辑：
+          // 关键修复：如果当前批次无数据，且不是第一年（2003），就应该尝试跨年
+          // 因为每年的期号数量不固定，保守策略是遇到无数据就跨年尝试
+          const currentYearFull = 2000 + currentYear;
+          const isFirstYear = (currentYearFull === 2003); // 双色球起始年份
+          
+          // 跨年策略：
+          // 1. 如果不是起始年份，无数据时就跨年（因为前面年份肯定有数据）
+          // 2. 如果是起始年份，但期号 > 100，也跨年（2003年确实有100+期）
+          const shouldCrossYear = !isFirstYear || currentIssueNum > 100;
           
           console.log(`\n========================================`);
           console.log(`⚠️  ${modules.name} 本批次无数据`);
           console.log(`   查询范围: ${startIssue} - ${endIssue}`);
           console.log(`   当前总计: ${currentTotal} 条`);
-          console.log(`   年底检查: ${isEndOfYear ? '是' : '否'} (当前年份: 20${currentYear})`);
+          console.log(`   跨年检查: ${shouldCrossYear ? '是' : '否'} (当前年份: ${currentYearFull}, 起始期号: ${currentIssueNum})`);
           console.log(`========================================\n`);
           
           return new Response(
             JSON.stringify({
               success: true,
-              message: isEndOfYear ? 
+              message: shouldCrossYear ? 
                 `${modules.name} 当年数据爬取完成，建议跨年继续` : 
                 `${modules.name} 数据已完整，所有历史数据已存在`,
               inserted: 0,
@@ -543,10 +553,10 @@ export default {
                 start: startIssue,
                 end: endIssue
               },
-              hasMore: isEndOfYear, // 如果到了年底，建议跨年继续
-              needsCrossYear: isEndOfYear,
-              currentYear: 2000 + currentYear,
-              note: isEndOfYear ? 
+              hasMore: shouldCrossYear, // 如果需要跨年，继续爬取
+              needsCrossYear: shouldCrossYear,
+              currentYear: currentYearFull,
+              note: shouldCrossYear ? 
                 '当年数据爬取完成，建议跨年继续爬取' : 
                 '本批次无数据，初始化完成'
             }),
