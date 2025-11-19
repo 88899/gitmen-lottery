@@ -484,13 +484,15 @@ export default {
           if (nextIssue > 200) {
             const nextYear = parseInt(yearPart) + 1;
             startIssue = `${nextYear.toString().padStart(2, '0')}001`;
+            console.log(`跨年处理: ${yearPart}${nextIssue} -> ${startIssue} (${2000 + nextYear}年)`);
           }
           
-          // 计算结束期号（小批量）
+          // 计算结束期号（小批量，不跨年）
           const startYear = parseInt(startIssue.substring(0, 2));
           const startIssueNum = parseInt(startIssue.substring(2));
           const endIssueNum = Math.min(startIssueNum + BATCH_SIZE - 1, 200);
           endIssue = `${startYear.toString().padStart(2, '0')}${endIssueNum.toString().padStart(3, '0')}`;
+          console.log(`批次范围计算: 起始=${startIssue}, 结束=${endIssue}, 批次大小=${endIssueNum - startIssueNum + 1}`);
         } else {
           // 数据库为空，从起始年份开始（小批量模式）
           const startYear = modules.startYear;
@@ -501,6 +503,7 @@ export default {
           const endIssueNum = Math.min(BATCH_SIZE, 200);
           endIssue = `${startYearShort}${endIssueNum.toString().padStart(3, '0')}`;
           console.log(`数据库为空，从起始年份 ${startYear} 开始（小批量模式）`);
+          console.log(`批次范围计算: 起始=${startIssue}, 结束=${endIssue}, 批次大小=${endIssueNum}`);
         }
         
         console.log(`爬取期号范围: ${startIssue} - ${endIssue}`);
@@ -509,11 +512,14 @@ export default {
         const data = await spider.fetch(startIssue, endIssue);
         
         if (!data || data.length === 0) {
-          // 没有新数据，说明已经是最新的
+          // 网站API返回空数据，直接停止（交给增量任务处理遗漏）
           const currentTotal = await db.getCount(type);
+          
           console.log(`\n========================================`);
-          console.log(`✅ ${modules.name} 数据已是最新，无需爬取`);
+          console.log(`✅ ${modules.name} 本批次无数据，停止爬取`);
+          console.log(`   查询范围: ${startIssue} - ${endIssue}`);
           console.log(`   当前总计: ${currentTotal} 条`);
+          console.log(`   💡 如有遗漏，增量任务会自动补齐`);
           console.log(`========================================\n`);
           
           return new Response(
@@ -530,7 +536,7 @@ export default {
                 end: endIssue
               },
               hasMore: false,
-              note: '历史数据已全部爬取完成'
+              note: '本批次无数据，初始化完成。如有遗漏，增量任务会自动补齐'
             }),
             {
               headers: { 'Content-Type': 'application/json; charset=utf-8' }
@@ -546,20 +552,23 @@ export default {
         
         const currentTotal = await db.getCount(type);
         
-        // 智能判断是否还有更多数据
-        const endYear = parseInt(endIssue.substring(0, 2));
-        const endIssueNum = parseInt(endIssue.substring(2));
-        const currentYearShort = parseInt(yearShort);
+        // 简化的判断逻辑：基于实际数据返回情况
+        const hasDataInBatch = result.inserted > 0;
+        const batchSizeIndicatesMore = data.length >= BATCH_SIZE * 0.8; // 批次接近满载
         
-        // 转换为完整年份进行比较
-        const endYearFull = endYear < 50 ? 2000 + endYear : 1900 + endYear; // 25 -> 2025, 03 -> 2003
-        const currentYearFull = parseInt(currentYear.toString());
+        // 简单明确的逻辑：
+        // 1. 如果本批次有数据，继续爬取
+        // 2. 如果本批次无数据，停止爬取（交给增量任务处理遗漏）
         
-        const hasMore = (data.length >= BATCH_SIZE * 0.8) || // 爬取量接近批次大小
-                       (endYearFull < currentYearFull) || // 还没到当前年份
-                       (endYearFull === currentYearFull && endIssueNum < 200); // 当前年份但还没到最后一期
+        const hasMore = hasDataInBatch;
+        const reason = hasDataInBatch ? 
+          (batchSizeIndicatesMore ? '本批次数据充足，继续爬取' : '本批次有数据，继续爬取') :
+          '本批次无数据，停止爬取';
         
-        console.log(`判断是否还有更多数据: 结束年份=${endYearFull}, 当前年份=${currentYearFull}, 结束期号=${endIssueNum}, hasMore=${hasMore}`);
+        console.log(`判断是否还有更多数据:`);
+        console.log(`  本批次: 新增=${result.inserted}, 获取=${data.length}/${BATCH_SIZE}`);
+        console.log(`  总数据: 当前=${currentTotal}`);
+        console.log(`  判断: hasMore=${hasMore} (${reason})`);
         
         console.log(`\n========================================`);
         console.log(`✅ ${modules.name} 本次爬取完成`);
@@ -590,7 +599,7 @@ export default {
               end: endIssue
             },
             hasMore: hasMore,
-            note: hasMore ? '可能还有更多数据需要爬取' : `${modules.name} 所有历史数据可能已爬取完成`
+            note: hasMore ? reason : `${modules.name} 所有历史数据已爬取完成`
           }),
           {
             headers: { 'Content-Type': 'application/json; charset=utf-8' }
