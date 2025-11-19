@@ -27,25 +27,17 @@ def setup_logging(lottery_type: str):
 
 
 def fetch_and_predict_single(lottery_type: str):
-    """
-    单个彩票类型的增量爬取和预测
-    
-    注意：此方法现在直接调用 fetch.py 中的核心方法，实现代码复用
-    """
-    logger.info(f"\n{'=' * 60}")
+    """单个彩票类型的增量爬取和预测（重构版本）"""
     logger.info(f"处理 {LOTTERY_NAMES.get(lottery_type, lottery_type)}")
-    logger.info(f"{'=' * 60}")
     
-    # 直接调用 fetch.py 中的核心方法，with_predict=True
-    from cli.fetch import fetch_incremental_data
-    return fetch_incremental_data(lottery_type, with_predict=True)
+    # 调用统一的智能爬取方法
+    from cli.smart_fetch import smart_fetch
+    return smart_fetch(lottery_type, mode='incremental', with_predict=True)
 
 
 def fetch_latest_data():
     """增量爬取所有彩票类型的最新数据并预测"""
-    logger.info("=" * 60)
     logger.info(f"定时任务开始: {datetime.now()}")
-    logger.info("=" * 60)
     
     results = []
     
@@ -103,9 +95,7 @@ def fetch_latest_data():
         except Exception as e:
             logger.error(f"发送 Telegram 通知失败: {e}", exc_info=True)
     
-    logger.info("=" * 60)
     logger.info(f"定时任务结束: {datetime.now()}")
-    logger.info("=" * 60 + "\n")
 
 
 def start_schedule(lottery_type: str = None):
@@ -137,12 +127,8 @@ def start_schedule(lottery_type: str = None):
         minute=30
     )
     
-    logger.info("=" * 60)
-    logger.info("定时任务已启动 - 所有彩票类型")
-    logger.info("执行时间: 每天 21:30")
-    logger.info("处理类型: 双色球 + 大乐透")
+    logger.info("定时任务已启动 - 每天 21:30 执行（双色球 + 大乐透）")
     logger.info("按 Ctrl+C 停止")
-    logger.info("=" * 60)
     
     # 启动时立即执行一次
     logger.info("\n首次执行...")
@@ -151,4 +137,4 @@ def start_schedule(lottery_type: str = None):
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
-        logger.info("\n定时任务已停止")
+        logger.info("定时任务已停止")

@@ -1,8 +1,5 @@
 /**
  * 彩票预测系统 - Cloudflare Workers 版本
- * 主入口文件
- * 
- * 说明：定时任务通过 Cloudflare Dashboard 的触发器配置
  */
 
 import { SSQSpider } from './spiders/ssq.js';
@@ -72,7 +69,6 @@ function getLotteryModules(type) {
 
 /**
  * 从 URL 路径中提取彩票类型
- * 支持 /action/type 格式，如果没有指定类型则默认为 ssq（兼容旧版本）
  */
 function extractLotteryType(pathname) {
   const parts = pathname.split('/').filter(p => p);
@@ -90,101 +86,200 @@ function extractLotteryType(pathname) {
 }
 
 /**
- * 处理单个彩票类型的增量更新和预测
+ * 统一的智能爬取方法
  * 
  * 核心逻辑：
- * 1. 从数据库获取最新期号
- * 2. 从下一期开始爬取到当年最后一期（如 25134 -> 25200）
- * 3. 入库所有新数据（自动跳过已存在的）
- * 4. 如果有新数据，进行预测
+ * 1. 从数据库获取最新期号（如果为空则从起始年份开始）
+ * 2. 计算下一批次的爬取范围（支持自动跨年）
+ * 3. 爬取数据，如果无数据则自动跨年重试
+ * 4. 返回爬取结果
  * 
- * 注意：此逻辑与 Python 版本完全一致
+ * 适用场景：初始化、增量更新、定时任务
  */
-async function processSingleLottery(type, env, config) {
+async function smartFetch(type, env, options = {}) {
   const modules = getLotteryModules(type);
   const db = new Database(env.DB);
   const spider = new modules.spider();
   
-  console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log(`📊 处理 ${modules.name}`);
-  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  const BATCH_SIZE = options.batchSize || 50;
+  const maxRetries = options.maxRetries || 1;
   
-  const startTime = Date.now();
-  const maxProcessTime = 3000; // 单个彩票类型最大处理时间 3 秒
+  console.log(`📊 智能爬取 ${modules.name}`);
   
   try {
     // 获取数据库中最新期号
     const latestInDb = await db.getLatest(type);
-    
-    // 确定爬取范围
-    const currentYear = new Date().getFullYear();
-    const yearShort = currentYear.toString().substring(2); // 25
-    
-    let startIssue;
+    let startIssue, endIssue;
     
     if (latestInDb) {
-      // 从数据库最新期号的下一期开始爬取
-      const latestNo = latestInDb.lottery_no; // 2025133
+      // 数据库有数据：基于最新期号计算下一批次范围
+      const latestNo = latestInDb.lottery_no; // 格式：2003089（7位）
       console.log(`数据库最新期号: ${latestNo}`);
       
-      // 解析期号：2025133 -> 25, 133
-      const yearPart = latestNo.substring(2, 4); // 25
-      const issuePart = parseInt(latestNo.substring(4)); // 133
+      // 解析期号：2003089 -> 年份2003, 期号089
+      const dbYear = parseInt(latestNo.substring(0, 4)); // 2003
+      const dbIssue = parseInt(latestNo.substring(4)); // 89
+      const yearShort = latestNo.substring(2, 4); // 03
       
-      // 下一期
-      const nextIssue = issuePart + 1;
-      startIssue = `${yearPart}${nextIssue.toString().padStart(3, '0')}`; // 25134
+      // 计算下一批次起始期号（最新期号+1）
+      const nextIssue = dbIssue + 1; // 89 + 1 = 90
+      
+      // 检查是否需要跨年
+      if (nextIssue > 200) {
+        // 跨年：进入下一年第一期
+        const nextYear = dbYear + 1; // 2003 + 1 = 2004
+        const nextYearShort = nextYear.toString().substring(2); // 04
+        startIssue = `${nextYearShort}001`; // 04001
+        endIssue = `${nextYearShort}${Math.min(1 + BATCH_SIZE - 1, 200).toString().padStart(3, '0')}`; // 04050
+        console.log(`跨年处理: ${latestNo}(${dbYear}) -> ${startIssue}-${endIssue}(${nextYear}年)`);
+      } else {
+        // 同年：继续当年期号
+        startIssue = `${yearShort}${nextIssue.toString().padStart(3, '0')}`; // 03090
+        
+        // 计算结束期号：start + 批次大小 - 1，但不超过200
+        let endIssueNum = nextIssue + BATCH_SIZE - 1; // 90 + 50 - 1 = 139
+        if (endIssueNum > 200) {
+          endIssueNum = 200;
+        }
+        
+        endIssue = `${yearShort}${endIssueNum.toString().padStart(3, '0')}`; // 03139
+        console.log(`同年继续: ${latestNo} -> ${startIssue}-${endIssue}`);
+      }
     } else {
-      // 数据库为空，从当年第一期开始
-      startIssue = `${yearShort}001`;
-      console.log('数据库为空，从当年第一期开始');
+      // 数据库为空：从起始年份开始
+      const startYear = modules.startYear;
+      const startYearShort = startYear.toString().substring(2);
+      startIssue = `${startYearShort}001`;
+      
+      // 计算结束期号（小批量）
+      const endIssueNum = Math.min(BATCH_SIZE, 200);
+      endIssue = `${startYearShort}${endIssueNum.toString().padStart(3, '0')}`;
+      console.log(`数据库为空，从起始年份 ${startYear} 开始`);
     }
-    
-    const endIssue = `${yearShort}200`;
     
     console.log(`爬取期号范围: ${startIssue} - ${endIssue}`);
     
-    // 调用统一的 fetch 方法
-    const data = await spider.fetch(startIssue, endIssue);
+    // 尝试爬取数据
+    let data = await spider.fetch(startIssue, endIssue);
+    let retryCount = 0;
     
+    // 如果无数据，尝试跨年重新爬取
+    while ((!data || data.length === 0) && retryCount < maxRetries) {
+      retryCount++;
+      
+      // 解析当前查询的年份并计算跨年参数
+      const currentQueryYear = parseInt(startIssue.substring(0, 2)) + 2000;
+      const nextYear = currentQueryYear + 1;
+      const nextYearShort = nextYear.toString().substring(2);
+      
+      // 计算跨年后的新查询范围
+      const crossYearStart = `${nextYearShort}001`;
+      const crossYearEnd = `${nextYearShort}${Math.min(BATCH_SIZE, 200).toString().padStart(3, '0')}`;
+      
+      console.log(`第${retryCount}次重试：${startIssue}-${endIssue} 无数据，跨年到 ${crossYearStart}-${crossYearEnd}`);
+      
+      // 用跨年参数重新爬取
+      data = await spider.fetch(crossYearStart, crossYearEnd);
+      startIssue = crossYearStart;
+      endIssue = crossYearEnd;
+      
+      if (data && data.length > 0) {
+        console.log(`跨年成功，获取 ${data.length} 条 ${nextYear} 年数据`);
+        break;
+      }
+    }
+    
+    // 处理爬取结果
     let inserted = 0;
+    let skipped = 0;
+    
     if (data && data.length > 0) {
       console.log(`获取 ${data.length} 条数据`);
       const result = await db.batchInsert(type, data);
       inserted = result.inserted;
-      console.log(`入库: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条`);
-      
-      if (inserted > 0) {
-        console.log(`✓ 发现并入库 ${inserted} 条新数据`);
-      } else {
-        console.log('✓ 暂无新数据');
-      }
-    } else {
-      console.log('✓ 暂无新数据');
+      skipped = result.skipped;
+      console.log(`入库: 新增 ${inserted} 条，跳过 ${skipped} 条`);
+    }
+    
+    const currentTotal = await db.getCount(type);
+    const hasNewData = inserted > 0;
+    const needsCrossYear = !hasNewData && retryCount < maxRetries;
+    
+    return {
+      success: true,
+      type: type,
+      name: modules.name,
+      inserted: inserted,
+      skipped: skipped,
+      total: currentTotal,
+      dataSource: '500.com',
+      queryParams: {
+        start: startIssue,
+        end: endIssue
+      },
+      hasMore: hasNewData || needsCrossYear,
+      needsCrossYear: needsCrossYear,
+      hasNewData: hasNewData,
+      retryCount: retryCount,
+      note: hasNewData ? 
+        `获得 ${inserted} 条新数据` : 
+        (needsCrossYear ? '本批次无数据，建议继续跨年' : '无数据，可能已完成')
+    };
+    
+  } catch (error) {
+    console.error(`${modules.name} 爬取失败:`, error);
+    return {
+      success: false,
+      type: type,
+      name: modules.name,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 处理单个彩票类型的增量更新和预测
+ */
+async function processSingleLottery(type, env, config) {
+  const startTime = Date.now();
+  const maxProcessTime = 3000; // 单个彩票类型最大处理时间 3 秒
+  
+  try {
+    // 调用统一的智能爬取方法
+    const fetchResult = await smartFetch(type, env, { batchSize: 50 });
+    
+    if (!fetchResult.success) {
+      return {
+        type: type,
+        name: fetchResult.name,
+        success: false,
+        message: fetchResult.error
+      };
     }
     
     // 获取最新一期（用于返回和显示）
+    const db = new Database(env.DB);
     const latest = await db.getLatest(type);
     
     if (!latest) {
       return {
         type: type,
-        name: modules.name,
+        name: fetchResult.name,
         success: true,
         message: '暂无数据',
         hasNewData: false
       };
     }
     
-    // 记录是否有新数据
-    const hasNewData = inserted > 0;
+    const hasNewData = fetchResult.hasNewData;
+    const inserted = fetchResult.inserted;
     
     // 检查是否超时
     if (Date.now() - startTime > maxProcessTime) {
-      console.warn(`${modules.name} 处理超时，跳过预测`);
+      console.warn(`${fetchResult.name} 处理超时，跳过预测`);
       return {
         type: type,
-        name: modules.name,
+        name: fetchResult.name,
         success: true,
         message: hasNewData ? '增量更新完成（跳过预测）' : '数据已是最新（跳过预测）',
         hasNewData: hasNewData,
@@ -224,14 +319,10 @@ async function processSingleLottery(type, env, config) {
 }
 
 /**
- * 执行每日任务（由 Cloudflare 触发器调用）
- * 同时处理双色球和大乐透
+ * 执行每日任务
  */
 async function runDailyTask(env) {
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('🎰 每日任务开始执行');
-  console.log('时间:', new Date().toISOString());
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🎰 每日任务开始执行:', new Date().toISOString());
   
   const taskStartTime = Date.now();
   const maxTaskTime = 8000; // 全局任务最大执行时间 8 秒（免费计划优化）
@@ -330,9 +421,7 @@ async function runDailyTask(env) {
       console.log('\n无新数据且无预测结果，跳过 Telegram 通知');
     }
     
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✅ 每日任务执行完成');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
     return {
       success: true,
@@ -439,217 +528,47 @@ export default {
       }
     }
     
-    // 初始化数据库（智能增量模式）
-    // 用途：首次运行时批量导入历史数据
-    // 逻辑：使用统一的增量爬取方法，从数据库最新期号开始爬取
-    // 特点：复用增量逻辑，智能判断是否完成，避免无效重试
+    // 初始化数据库（重构为调用统一方法）
     if (url.pathname.startsWith('/init') && request.method === 'POST') {
       // 提取彩票类型：/init/ssq 或 /init/dlt，默认 ssq
       const type = extractLotteryType(url.pathname) || 'ssq';
       try {
-        const modules = getLotteryModules(type);
         const db = new Database(env.DB);
         await db.init();
         
-        const spider = new modules.spider();
+        console.log(`🎯 初始化 ${getLotteryModules(type).name} 历史数据`);
         
-        console.log(`\n========================================`);
-        console.log(`🎯 开始爬取 ${modules.name} 历史数据（智能增量模式）`);
-        console.log(`========================================`);
+        // 调用统一的智能爬取方法
+        const result = await smartFetch(type, env, { batchSize: 50, maxRetries: 1 });
         
-        // 获取数据库最新期号
-        const latestInDb = await db.getLatest(type);
-        
-        // 确定爬取范围（优化：小批量处理，避免超时）
-        const currentYear = new Date().getFullYear();
-        const yearShort = currentYear.toString().substring(2);
-        
-        let startIssue, endIssue;
-        const BATCH_SIZE = 50; // 每次最多爬取50期，避免超时
-        
-        if (latestInDb) {
-          // 按照预演逻辑：基于数据库最新期号计算下一批次范围
-          const latestNo = latestInDb.lottery_no; // 格式：2003089（7位）
-          console.log(`数据库最新期号: ${latestNo}`);
-          
-          // 解析期号：2003089 -> 年份2003, 期号089
-          const dbYear = parseInt(latestNo.substring(0, 4)); // 2003
-          const dbIssue = parseInt(latestNo.substring(4)); // 89
-          const yearShort = latestNo.substring(2, 4); // 03
-          
-          // 计算下一批次起始期号（最新期号+1）
-          const nextIssue = dbIssue + 1; // 89 + 1 = 90
-          
-          // 检查是否需要跨年
-          if (nextIssue > 200) {
-            // 跨年：进入下一年第一期
-            const nextYear = dbYear + 1; // 2003 + 1 = 2004
-            const nextYearShort = nextYear.toString().substring(2); // 04
-            startIssue = `${nextYearShort}001`; // 04001
-            endIssue = `${nextYearShort}${Math.min(1 + BATCH_SIZE - 1, 200).toString().padStart(3, '0')}`; // 04050
-            console.log(`跨年处理: ${latestNo}(${dbYear}) -> ${startIssue}-${endIssue}(${nextYear}年)`);
-          } else {
-            // 同年：继续当年期号
-            startIssue = `${yearShort}${nextIssue.toString().padStart(3, '0')}`; // 03090
-            
-            // 计算结束期号：start + 批次大小 - 1，但不超过200
-            let endIssueNum = nextIssue + BATCH_SIZE - 1; // 90 + 50 - 1 = 139
-            if (endIssueNum > 200) {
-              endIssueNum = 200;
-            }
-            
-            endIssue = `${yearShort}${endIssueNum.toString().padStart(3, '0')}`; // 03139
-            console.log(`同年继续: ${latestNo} -> ${startIssue}-${endIssue}`);
-          }
-        } else {
-          // 数据库为空，从起始年份开始（小批量模式）
-          const startYear = modules.startYear;
-          const startYearShort = startYear.toString().substring(2);
-          startIssue = `${startYearShort}001`;
-          
-          // 计算结束期号（小批量）
-          const endIssueNum = Math.min(BATCH_SIZE, 200);
-          endIssue = `${startYearShort}${endIssueNum.toString().padStart(3, '0')}`;
-          console.log(`数据库为空，从起始年份 ${startYear} 开始（小批量模式）`);
-          console.log(`批次范围计算: 起始=${startIssue}, 结束=${endIssue}, 批次大小=${endIssueNum}`);
-        }
-        
-        console.log(`爬取期号范围: ${startIssue} - ${endIssue}`);
-        
-        // 调用统一的 fetch 方法
-        const data = await spider.fetch(startIssue, endIssue);
-        
-        if (!data || data.length === 0) {
-          // 无数据时直接跨年重新爬取（不插入虚拟记录）
-          const currentTotal = await db.getCount(type);
-          
-          // 解析当前查询的年份并计算跨年参数
-          const currentQueryYear = parseInt(startIssue.substring(0, 2)) + 2000; // 03 -> 2003
-          const nextYear = currentQueryYear + 1; // 2004
-          const nextYearShort = nextYear.toString().substring(2); // 04
-          
-          // 计算跨年后的新查询范围
-          const crossYearStart = `${nextYearShort}001`; // 04001
-          const crossYearEnd = `${nextYearShort}${Math.min(BATCH_SIZE, 200).toString().padStart(3, '0')}`; // 04050
-          
-          console.log(`当前查询 ${startIssue}-${endIssue} 无数据，跨年到 ${crossYearStart}-${crossYearEnd}`);
-          
-          // 直接用跨年参数重新爬取
-          const crossYearData = await spider.fetch(crossYearStart, crossYearEnd);
-          
-          if (crossYearData && crossYearData.length > 0) {
-            // 跨年后有数据，入库
-            console.log(`跨年成功，获取 ${crossYearData.length} 条 ${nextYear} 年数据`);
-            const result = await db.batchInsert(type, crossYearData);
-            
-            return new Response(
-              JSON.stringify({
-                success: true,
-                message: `${modules.name} 跨年爬取完成`,
-                inserted: result.inserted,
-                skipped: result.skipped,
-                total: await db.getCount(type),
-                dataSource: '500.com',
-                lotteryType: type,
-                queryParams: {
-                  start: crossYearStart,
-                  end: crossYearEnd
-                },
-                hasMore: true,
-                needsCrossYear: false, // 已经跨年并获得数据
-                currentYear: nextYear,
-                crossedFromYear: currentQueryYear,
-                note: `从 ${currentQueryYear} 年跨年到 ${nextYear} 年，获得 ${result.inserted} 条新数据`
-              }),
-              {
-                headers: { 'Content-Type': 'application/json; charset=utf-8' }
-              }
-            );
-          }
-          // 跨年后仍无数据
-          console.log(`跨年到 ${nextYear} 年仍无数据`);
-          
+        if (!result.success) {
           return new Response(
             JSON.stringify({
-              success: true,
-              message: `${modules.name} 跨年后仍无数据`,
-              inserted: 0,
-              skipped: 0,
-              total: currentTotal,
-              dataSource: '500.com',
-              lotteryType: type,
-              queryParams: {
-                start: crossYearStart,
-                end: crossYearEnd
-              },
-              hasMore: true, // 继续尝试，让脚本层面控制停止
-              needsCrossYear: true,
-              currentYear: nextYear,
-              crossedFromYear: currentQueryYear,
-              note: `从 ${currentQueryYear} 年跨年到 ${nextYear} 年，仍无数据，继续尝试下一年`
+              success: false,
+              error: result.error
             }),
             {
+              status: 500,
               headers: { 'Content-Type': 'application/json; charset=utf-8' }
             }
           );
         }
         
-        console.log(`✓ 获取 ${data.length} 条数据`);
-        
-        // 批量插入（自动跳过已存在的数据）
-        const result = await db.batchInsert(type, data);
-        console.log(`✓ 入库: 新增 ${result.inserted} 条，跳过 ${result.skipped} 条`);
-        
-        const currentTotal = await db.getCount(type);
-        
-        // 简化的判断逻辑：基于实际数据返回情况
-        const hasDataInBatch = result.inserted > 0;
-        const batchSizeIndicatesMore = data.length >= BATCH_SIZE * 0.8; // 批次接近满载
-        
-        // 简单明确的逻辑：
-        // 1. 如果本批次有数据，继续爬取
-        // 2. 如果本批次无数据，停止爬取（交给增量任务处理遗漏）
-        
-        const hasMore = hasDataInBatch;
-        const reason = hasDataInBatch ? 
-          (batchSizeIndicatesMore ? '本批次数据充足，继续爬取' : '本批次有数据，继续爬取') :
-          '本批次无数据，停止爬取';
-        
-        console.log(`判断是否还有更多数据:`);
-        console.log(`  本批次: 新增=${result.inserted}, 获取=${data.length}/${BATCH_SIZE}`);
-        console.log(`  总数据: 当前=${currentTotal}`);
-        console.log(`  判断: hasMore=${hasMore} (${reason})`);
-        
-        console.log(`\n========================================`);
-        console.log(`✅ ${modules.name} 本次爬取完成`);
-        console.log(`   新增: ${result.inserted} 条`);
-        console.log(`   跳过: ${result.skipped} 条`);
-        console.log(`   当前总计: ${currentTotal} 条`);
-        if (hasMore) {
-          console.log(`   💡 提示: 可能还有更多数据，请继续执行 /init/${type}`);
-        } else {
-          console.log(`   🎉 ${modules.name} 所有历史数据可能已爬取完成！`);
-        }
-        console.log(`========================================\n`);
-        
-        // 注意：初始化不发送 Telegram 通知，只有增量更新和预测才发送
-        console.log('初始化完成，不发送 Telegram 通知');
+        console.log(`✅ ${result.name} 初始化完成: 新增 ${result.inserted} 条，总计 ${result.total} 条`);
         
         return new Response(
           JSON.stringify({
             success: true,
-            message: `${modules.name} 数据爬取完成`,
+            message: result.note,
             inserted: result.inserted,
             skipped: result.skipped,
-            total: currentTotal,
-            dataSource: '500.com',
+            total: result.total,
+            dataSource: result.dataSource,
             lotteryType: type,
-            queryParams: {
-              start: startIssue,
-              end: endIssue
-            },
-            hasMore: hasMore,
-            note: hasMore ? reason : `${modules.name} 所有历史数据已爬取完成`
+            queryParams: result.queryParams,
+            hasMore: result.hasMore,
+            needsCrossYear: result.needsCrossYear,
+            note: result.note
           }),
           {
             headers: { 'Content-Type': 'application/json; charset=utf-8' }
