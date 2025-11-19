@@ -492,10 +492,15 @@ export default {
           const endIssueNum = Math.min(startIssueNum + BATCH_SIZE - 1, 200);
           endIssue = `${startYear.toString().padStart(2, '0')}${endIssueNum.toString().padStart(3, '0')}`;
         } else {
-          // 数据库为空，从当前年份开始（而不是起始年份，避免一次性爬取太多）
-          startIssue = `${yearShort}001`;
-          endIssue = `${yearShort}${Math.min(BATCH_SIZE, 200).toString().padStart(3, '0')}`;
-          console.log('数据库为空，从当前年份开始（小批量模式）');
+          // 数据库为空，从起始年份开始（小批量模式）
+          const startYear = modules.startYear;
+          const startYearShort = startYear.toString().substring(2);
+          startIssue = `${startYearShort}001`;
+          
+          // 计算结束期号（小批量）
+          const endIssueNum = Math.min(BATCH_SIZE, 200);
+          endIssue = `${startYearShort}${endIssueNum.toString().padStart(3, '0')}`;
+          console.log(`数据库为空，从起始年份 ${startYear} 开始（小批量模式）`);
         }
         
         console.log(`爬取期号范围: ${startIssue} - ${endIssue}`);
@@ -542,15 +547,19 @@ export default {
         const currentTotal = await db.getCount(type);
         
         // 智能判断是否还有更多数据
-        // 1. 如果本次爬取的数据量达到批次大小，可能还有更多
-        // 2. 如果结束期号还没到当前年份的最后一期，可能还有更多
         const endYear = parseInt(endIssue.substring(0, 2));
         const endIssueNum = parseInt(endIssue.substring(2));
         const currentYearShort = parseInt(yearShort);
         
+        // 转换为完整年份进行比较
+        const endYearFull = endYear < 50 ? 2000 + endYear : 1900 + endYear; // 25 -> 2025, 03 -> 2003
+        const currentYearFull = parseInt(currentYear.toString());
+        
         const hasMore = (data.length >= BATCH_SIZE * 0.8) || // 爬取量接近批次大小
-                       (endYear < currentYearShort) || // 还没到当前年份
-                       (endYear === currentYearShort && endIssueNum < 200); // 当前年份但还没到最后一期
+                       (endYearFull < currentYearFull) || // 还没到当前年份
+                       (endYearFull === currentYearFull && endIssueNum < 200); // 当前年份但还没到最后一期
+        
+        console.log(`判断是否还有更多数据: 结束年份=${endYearFull}, 当前年份=${currentYearFull}, 结束期号=${endIssueNum}, hasMore=${hasMore}`);
         
         console.log(`\n========================================`);
         console.log(`✅ ${modules.name} 本次爬取完成`);

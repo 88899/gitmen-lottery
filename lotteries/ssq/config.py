@@ -119,6 +119,9 @@ OUTPUT_CONFIG = {
     'include_statistics': True,    # 是否包含统计信息
 }
 
+# 历史数据
+START_YEAR = 2003  # 双色球从2003年开始
+
 if __name__ == '__main__':
     print("SSQ (双色球) 规则:")
     print(SSQ_RULES)

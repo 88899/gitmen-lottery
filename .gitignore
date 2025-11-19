@@ -55,7 +55,15 @@ Thumbs.db
 *.tmp
 *.bak
 *.cache
+test_*.py
+verify_*.py
+verify_*.js
+*_test.py
+*_test.js
 
 # 测试临时文件
 tests/*.pyc
 tests/__pycache__/
+
+# 进程文件
+/tmp/lottery_init_count_*.txt

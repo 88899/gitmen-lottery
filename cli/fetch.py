@@ -226,6 +226,7 @@ def fetch_incremental_data(lottery_type: str, with_predict: bool = False):
         if lottery_type == 'ssq':
             from lotteries.ssq.spider import SSQSpider
             from lotteries.ssq.database import SSQDatabase
+            from lotteries.ssq.config import START_YEAR
             
             spider = SSQSpider(timeout=15, retry_times=3)
             db = SSQDatabase(load_db_config())
@@ -241,7 +242,7 @@ def fetch_incremental_data(lottery_type: str, with_predict: bool = False):
             year_short = str(current_year)[2:]
             
             if latest_in_db:
-                # 从数据库最新期号的下一期开始爬取
+                # 从数据库最新期号的下一期开始爬取（逐年模式）
                 latest_no = latest_in_db['lottery_no']
                 logger.info(f"数据库最新期号: {latest_no}")
                 
@@ -251,13 +252,27 @@ def fetch_incremental_data(lottery_type: str, with_predict: bool = False):
                 
                 # 下一期
                 next_issue = issue_part + 1
-                start_issue = f"{year_part}{next_issue:03d}"
+                
+                # 检查是否跨年
+                if next_issue > 200:
+                    # 跨年：进入下一年的第一期
+                    next_year = int(year_part) + 1
+                    start_issue = f"{next_year:02d}001"
+                    end_issue = f"{next_year:02d}200"
+                    logger.info(f"跨年爬取：从 {2000 + next_year} 年开始（逐年模式）")
+                else:
+                    # 同年：继续当年的期号
+                    start_issue = f"{year_part}{next_issue:03d}"
+                    end_issue = f"{year_part}200"
+                    logger.info(f"同年爬取：继续 {2000 + int(year_part)} 年（逐年模式）")
             else:
-                # 数据库为空，从当年第一期开始
-                start_issue = f"{year_short}001"
-                logger.info("数据库为空，从当年第一期开始")
-            
-            end_issue = f"{year_short}200"
+                # 数据库为空，从起始年份开始（逐年爬取）
+                start_year_short = str(START_YEAR)[2:]
+                start_issue = f"{start_year_short}001"
+                
+                # 逐年爬取：只爬取起始年份的数据
+                end_issue = f"{start_year_short}200"
+                logger.info(f"数据库为空，从起始年份 {START_YEAR} 开始（逐年爬取）")
             
             logger.info(f"爬取期号范围: {start_issue} - {end_issue}")
             
@@ -322,6 +337,7 @@ def fetch_incremental_data(lottery_type: str, with_predict: bool = False):
         elif lottery_type == 'dlt':
             from lotteries.dlt.spider import DLTSpider
             from lotteries.dlt.database import DLTDatabase
+            from lotteries.dlt.config import START_YEAR
             
             spider = DLTSpider(timeout=15, retry_times=3)
             db = DLTDatabase(load_db_config())
@@ -337,7 +353,7 @@ def fetch_incremental_data(lottery_type: str, with_predict: bool = False):
             year_short = str(current_year)[2:]
             
             if latest_in_db:
-                # 从数据库最新期号的下一期开始爬取
+                # 从数据库最新期号的下一期开始爬取（逐年模式）
                 latest_no = latest_in_db['lottery_no']
                 logger.info(f"数据库最新期号: {latest_no}")
                 
@@ -347,13 +363,27 @@ def fetch_incremental_data(lottery_type: str, with_predict: bool = False):
                 
                 # 下一期
                 next_issue = issue_part + 1
-                start_issue = f"{year_part}{next_issue:03d}"
+                
+                # 检查是否跨年
+                if next_issue > 200:
+                    # 跨年：进入下一年的第一期
+                    next_year = int(year_part) + 1
+                    start_issue = f"{next_year:02d}001"
+                    end_issue = f"{next_year:02d}200"
+                    logger.info(f"跨年爬取：从 {2000 + next_year} 年开始（逐年模式）")
+                else:
+                    # 同年：继续当年的期号
+                    start_issue = f"{year_part}{next_issue:03d}"
+                    end_issue = f"{year_part}200"
+                    logger.info(f"同年爬取：继续 {2000 + int(year_part)} 年（逐年模式）")
             else:
-                # 数据库为空，从当年第一期开始
-                start_issue = f"{year_short}001"
-                logger.info("数据库为空，从当年第一期开始")
-            
-            end_issue = f"{year_short}200"
+                # 数据库为空，从起始年份开始（逐年爬取）
+                start_year_short = str(START_YEAR)[2:]
+                start_issue = f"{start_year_short}001"
+                
+                # 逐年爬取：只爬取起始年份的数据
+                end_issue = f"{start_year_short}200"
+                logger.info(f"数据库为空，从起始年份 {START_YEAR} 开始（逐年爬取）")
             
             logger.info(f"爬取期号范围: {start_issue} - {end_issue}")
             

@@ -193,8 +193,8 @@ TELEGRAM_SEND_TO_BOT=true                   # 是否发送给机器人
 TELEGRAM_SEND_TO_CHANNEL=false             # 是否发送给频道
 
 # 代理（可选，用于本地测试）
-TELEGRAM_PROXY_HOST=127.0.0.1
-TELEGRAM_PROXY_PORT=7890
+# 如果在中国大陆需要代理访问 Telegram API
+TELEGRAM_PROXY=http://127.0.0.1:7890  # 代理地址，根据你的代理工具调整端口
 ```
 
 ## 🔄 最新更新（2025-11-19）
