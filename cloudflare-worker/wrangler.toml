@@ -8,6 +8,11 @@ ENVIRONMENT = "production"
 DEFAULT_STRATEGIES = "frequency,random,balanced,coldHot"  # 默认预测策略（免费计划优化：减少策略数量）
 DEFAULT_PREDICTION_COUNT = "4"    # 默认预测条数（免费计划优化：减少预测数量）
 
+# Telegram 频道配置
+TELEGRAM_CHANNEL_ID = "@renren500w"
+TELEGRAM_SEND_TO_BOT = "true"
+TELEGRAM_SEND_TO_CHANNEL = "true"
+
 # D1 数据库绑定
 [[d1_databases]]
 binding = "DB"
@@ -30,3 +35,4 @@ crons = ["00 14 * * *"]
 #    - TELEGRAM_BOT_TOKEN
 #    - TELEGRAM_CHAT_ID
 #    - API_KEY
+

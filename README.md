@@ -187,6 +187,11 @@ DEFAULT_PREDICTION_COUNT=5                            # 每种策略生成组合
 TELEGRAM_BOT_TOKEN=your_token
 TELEGRAM_CHAT_ID=your_chat_id
 
+# Telegram 频道配置（可选）
+TELEGRAM_CHANNEL_ID=@your_channel_username  # 或 -1001234567890
+TELEGRAM_SEND_TO_BOT=true                   # 是否发送给机器人
+TELEGRAM_SEND_TO_CHANNEL=false             # 是否发送给频道
+
 # 代理（可选，用于本地测试）
 TELEGRAM_PROXY_HOST=127.0.0.1
 TELEGRAM_PROXY_PORT=7890
@@ -194,10 +199,22 @@ TELEGRAM_PROXY_PORT=7890
 
 ## 🔄 最新更新（2025-11-19）
 
+### 📢 Telegram 频道支持
+- **新功能**：支持同时发送消息到 Telegram 机器人和频道
+- **灵活配置**：可选择发送给机器人、频道或两者
+- **统一接口**：Python 和 Cloudflare Worker 版本保持一致
+- **配置文档**：[Telegram 频道设置指南](./docs/TELEGRAM_CHANNEL_SETUP.md)
+
 ### 🎯 预测策略配置修复
 - **修复问题**：预测器只使用 `frequency` 策略，忽略 `.env` 配置
 - **根本原因**：所有预测器调用都没有传入 `strategies` 参数
 - **修复文件**：`cli/fetch.py`、`cli/predict.py`、`cli/schedule.py`
+
+### 📱 Telegram 消息格式优化
+- **分开发送**：双色球和大乐透分别发送，避免消息过长
+- **格式清晰**：每个组合单独显示，策略名称明确标注
+- **等宽字体**：使用 `<code>` 标签确保号码对齐
+- **简洁明了**：去除冗余信息，专注于预测结果
 - **修复效果**：现在完全按照 `.env` 中的 `DEFAULT_STRATEGIES` 配置工作
 
 ### 📊 多策略预测增强

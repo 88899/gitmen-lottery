@@ -92,5 +92,8 @@ DEFAULT_PREDICTION_COUNT = int(os.getenv('DEFAULT_PREDICTION_COUNT', 5))
 # Telegram 配置
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+TELEGRAM_CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID')  # 频道 ID（可选）
+TELEGRAM_SEND_TO_BOT = os.getenv('TELEGRAM_SEND_TO_BOT', 'true').lower() in ['true', '1', 'yes']
+TELEGRAM_SEND_TO_CHANNEL = os.getenv('TELEGRAM_SEND_TO_CHANNEL', 'false').lower() in ['true', '1', 'yes']
 TELEGRAM_PROXY_HOST = os.getenv('TELEGRAM_PROXY_HOST')
 TELEGRAM_PROXY_PORT = int(os.getenv('TELEGRAM_PROXY_PORT', 0)) if os.getenv('TELEGRAM_PROXY_PORT') else None

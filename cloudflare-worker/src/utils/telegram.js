@@ -3,21 +3,71 @@
  */
 
 export class TelegramBot {
-  constructor(botToken, chatId) {
+  constructor(botToken, chatId, channelId = null, sendToBot = true, sendToChannel = false) {
     this.botToken = botToken;
     this.chatId = chatId;
+    this.channelId = channelId;
+    this.sendToBot = sendToBot;
+    this.sendToChannel = sendToChannel;
     this.apiUrl = `https://api.telegram.org/bot${botToken}`;
+    
+    // 检查发送目标
+    const targets = [];
+    if (this.sendToBot && this.chatId) {
+      targets.push(`机器人(${this.chatId})`);
+    }
+    if (this.sendToChannel && this.channelId) {
+      targets.push(`频道(${this.channelId})`);
+    }
+    
+    if (targets.length > 0) {
+      console.log(`Telegram 发送目标: ${targets.join(', ')}`);
+    } else {
+      console.warn('未配置有效的 Telegram 发送目标');
+    }
   }
 
   /**
-   * 发送消息
+   * 发送消息到配置的目标（机器人和/或频道）
    */
   async sendMessage(text, parseMode = 'HTML') {
-    if (!this.botToken || !this.chatId) {
-      console.warn('Telegram 未配置，跳过发送');
+    if (!this.botToken) {
+      console.warn('Telegram Bot Token 未配置，跳过发送');
       return false;
     }
 
+    let successCount = 0;
+    let totalTargets = 0;
+
+    // 发送给机器人
+    if (this.sendToBot && this.chatId) {
+      totalTargets++;
+      if (await this._sendToTarget(this.chatId, text, parseMode, '机器人')) {
+        successCount++;
+      }
+    }
+
+    // 发送给频道
+    if (this.sendToChannel && this.channelId) {
+      totalTargets++;
+      if (await this._sendToTarget(this.channelId, text, parseMode, '频道')) {
+        successCount++;
+      }
+    }
+
+    if (totalTargets === 0) {
+      console.warn('未配置有效的 Telegram 发送目标');
+      return false;
+    }
+
+    console.log(`Telegram 消息发送完成: ${successCount}/${totalTargets} 成功`);
+    return successCount > 0;
+  }
+
+  /**
+   * 发送消息到指定目标
+   */
+  async _sendToTarget(targetId, text, parseMode, targetType) {
     try {
       const response = await fetch(`${this.apiUrl}/sendMessage`, {
         method: 'POST',
@@ -25,7 +75,7 @@ export class TelegramBot {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          chat_id: this.chatId,
+          chat_id: targetId,
           text: text,
           parse_mode: parseMode
         })
@@ -42,12 +92,34 @@ export class TelegramBot {
         throw new Error(`Telegram 发送失败: ${data.description}`);
       }
 
-      console.log('Telegram 消息发送成功');
+      console.log(`Telegram 消息发送成功 -> ${targetType}(${targetId})`);
       return true;
     } catch (error) {
-      console.error('Telegram 发送失败:', error);
+      console.error(`Telegram 消息发送失败 -> ${targetType}(${targetId}):`, error);
       return false;
     }
+  }
+
+  /**
+   * 仅发送给机器人
+   */
+  async sendToBotOnly(text, parseMode = 'HTML') {
+    if (!this.botToken || !this.chatId) {
+      console.warn('机器人未配置，跳过发送');
+      return false;
+    }
+    return await this._sendToTarget(this.chatId, text, parseMode, '机器人');
+  }
+
+  /**
+   * 仅发送给频道
+   */
+  async sendToChannelOnly(text, parseMode = 'HTML') {
+    if (!this.botToken || !this.channelId) {
+      console.warn('频道未配置，跳过发送');
+      return false;
+    }
+    return await this._sendToTarget(this.channelId, text, parseMode, '频道');
   }
 
   /**

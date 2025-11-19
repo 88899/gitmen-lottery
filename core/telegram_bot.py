@@ -11,18 +11,27 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramBot:
-    """Telegram 机器人类"""
+    """Telegram 机器人类 - 支持机器人和频道发送"""
 
-    def __init__(self, bot_token: str = None, chat_id: str = None):
+    def __init__(self, bot_token: str = None, chat_id: str = None, channel_id: str = None):
         """
         初始化 Telegram 机器人
 
         Args:
             bot_token: 机器人 Token
-            chat_id: 聊天 ID
+            chat_id: 聊天 ID（机器人私聊或群组）
+            channel_id: 频道 ID（可选）
         """
-        self.bot_token = bot_token or os.getenv('TELEGRAM_BOT_TOKEN')
-        self.chat_id = chat_id or os.getenv('TELEGRAM_CHAT_ID')
+        from core.config import (
+            TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_CHANNEL_ID,
+            TELEGRAM_SEND_TO_BOT, TELEGRAM_SEND_TO_CHANNEL
+        )
+        
+        self.bot_token = bot_token or TELEGRAM_BOT_TOKEN
+        self.chat_id = chat_id or TELEGRAM_CHAT_ID
+        self.channel_id = channel_id or TELEGRAM_CHANNEL_ID
+        self.send_to_bot = TELEGRAM_SEND_TO_BOT
+        self.send_to_channel = TELEGRAM_SEND_TO_CHANNEL
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
         
         # 代理配置（仅本地测试使用，生产环境不需要）
@@ -35,28 +44,76 @@ class TelegramBot:
             }
             logger.info(f"使用代理: {proxy_url}")
 
-        if not self.bot_token or not self.chat_id:
-            logger.warning("Telegram 配置未设置，通知功能将不可用")
+        # 检查配置
+        if not self.bot_token:
+            logger.warning("Telegram Bot Token 未设置，通知功能将不可用")
+        
+        # 检查发送目标
+        targets = []
+        if self.send_to_bot and self.chat_id:
+            targets.append(f"机器人({self.chat_id})")
+        if self.send_to_channel and self.channel_id:
+            targets.append(f"频道({self.channel_id})")
+        
+        if targets:
+            logger.info(f"Telegram 发送目标: {', '.join(targets)}")
+        else:
+            logger.warning("未配置有效的 Telegram 发送目标")
 
     def send_message(self, text: str, parse_mode: str = 'HTML') -> bool:
         """
-        发送消息
+        发送消息到配置的目标（机器人和/或频道）
 
         Args:
             text: 消息内容
             parse_mode: 解析模式 (HTML/Markdown)
 
         Returns:
-            是否发送成功
+            是否至少有一个目标发送成功
         """
-        if not self.bot_token or not self.chat_id:
-            logger.warning("Telegram 未配置，跳过发送")
+        if not self.bot_token:
+            logger.warning("Telegram Bot Token 未配置，跳过发送")
             return False
 
+        success_count = 0
+        total_targets = 0
+
+        # 发送给机器人
+        if self.send_to_bot and self.chat_id:
+            total_targets += 1
+            if self._send_to_target(self.chat_id, text, parse_mode, "机器人"):
+                success_count += 1
+
+        # 发送给频道
+        if self.send_to_channel and self.channel_id:
+            total_targets += 1
+            if self._send_to_target(self.channel_id, text, parse_mode, "频道"):
+                success_count += 1
+
+        if total_targets == 0:
+            logger.warning("未配置有效的 Telegram 发送目标")
+            return False
+
+        logger.info(f"Telegram 消息发送完成: {success_count}/{total_targets} 成功")
+        return success_count > 0
+
+    def _send_to_target(self, target_id: str, text: str, parse_mode: str, target_type: str) -> bool:
+        """
+        发送消息到指定目标
+
+        Args:
+            target_id: 目标 ID
+            text: 消息内容
+            parse_mode: 解析模式
+            target_type: 目标类型（用于日志）
+
+        Returns:
+            是否发送成功
+        """
         try:
             url = f"{self.api_url}/sendMessage"
             data = {
-                'chat_id': self.chat_id,
+                'chat_id': target_id,
                 'text': text,
                 'parse_mode': parse_mode
             }
@@ -64,11 +121,11 @@ class TelegramBot:
             response = requests.post(url, json=data, timeout=10, proxies=self.proxies)
             response.raise_for_status()
 
-            logger.info("Telegram 消息发送成功")
+            logger.info(f"Telegram 消息发送成功 -> {target_type}({target_id})")
             return True
 
         except Exception as e:
-            logger.error(f"Telegram 消息发送失败: {e}")
+            logger.error(f"Telegram 消息发送失败 -> {target_type}({target_id}): {e}")
             return False
 
     def send_lottery_result(self, lottery_type: str, lottery_no: str, 
@@ -250,6 +307,68 @@ class TelegramBot:
 
         return self.send_message(message)
 
+    def send_to_bot_only(self, text: str, parse_mode: str = 'HTML') -> bool:
+        """
+        仅发送给机器人
+
+        Args:
+            text: 消息内容
+            parse_mode: 解析模式
+
+        Returns:
+            是否发送成功
+        """
+        if not self.bot_token or not self.chat_id:
+            logger.warning("机器人未配置，跳过发送")
+            return False
+
+        return self._send_to_target(self.chat_id, text, parse_mode, "机器人")
+
+    def send_to_channel_only(self, text: str, parse_mode: str = 'HTML') -> bool:
+        """
+        仅发送给频道
+
+        Args:
+            text: 消息内容
+            parse_mode: 解析模式
+
+        Returns:
+            是否发送成功
+        """
+        if not self.bot_token or not self.channel_id:
+            logger.warning("频道未配置，跳过发送")
+            return False
+
+        return self._send_to_target(self.channel_id, text, parse_mode, "频道")
+
+    def get_channel_info(self) -> Optional[Dict]:
+        """
+        获取频道信息
+
+        Returns:
+            频道信息字典，失败返回 None
+        """
+        if not self.bot_token or not self.channel_id:
+            return None
+
+        try:
+            url = f"{self.api_url}/getChat"
+            data = {'chat_id': self.channel_id}
+            
+            response = requests.post(url, json=data, timeout=10, proxies=self.proxies)
+            response.raise_for_status()
+            
+            result = response.json()
+            if result.get('ok'):
+                return result.get('result')
+            else:
+                logger.error(f"获取频道信息失败: {result.get('description')}")
+                return None
+
+        except Exception as e:
+            logger.error(f"获取频道信息失败: {e}")
+            return None
+
     def test_connection(self) -> bool:
         """
         测试连接
@@ -266,6 +385,20 @@ class TelegramBot:
             if data.get('ok'):
                 bot_info = data.get('result', {})
                 logger.info(f"Telegram 机器人连接成功: @{bot_info.get('username')}")
+                
+                # 测试频道连接（如果配置了）
+                if self.channel_id:
+                    channel_info = self.get_channel_info()
+                    if channel_info:
+                        channel_title = channel_info.get('title', 'Unknown')
+                        channel_username = channel_info.get('username', '')
+                        if channel_username:
+                            logger.info(f"频道连接成功: {channel_title} (@{channel_username})")
+                        else:
+                            logger.info(f"频道连接成功: {channel_title}")
+                    else:
+                        logger.warning("频道连接失败或无权限")
+                
                 return True
             else:
                 logger.error("Telegram 机器人连接失败")
@@ -274,3 +407,19 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"Telegram 连接测试失败: {e}")
             return False
+
+    def get_config_info(self) -> Dict:
+        """
+        获取当前配置信息
+
+        Returns:
+            配置信息字典
+        """
+        return {
+            'bot_token_configured': bool(self.bot_token),
+            'chat_id': self.chat_id,
+            'channel_id': self.channel_id,
+            'send_to_bot': self.send_to_bot,
+            'send_to_channel': self.send_to_channel,
+            'proxy_configured': bool(self.proxies)
+        }

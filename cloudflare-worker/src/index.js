@@ -19,6 +19,9 @@ async function getConfig(env) {
   const config = {
     telegramBotToken: await env.KV_BINDING.get('TELEGRAM_BOT_TOKEN'),
     telegramChatId: await env.KV_BINDING.get('TELEGRAM_CHAT_ID'),
+    telegramChannelId: await env.KV_BINDING.get('TELEGRAM_CHANNEL_ID'),
+    telegramSendToBot: await env.KV_BINDING.get('TELEGRAM_SEND_TO_BOT'),
+    telegramSendToChannel: await env.KV_BINDING.get('TELEGRAM_SEND_TO_CHANNEL'),
     apiKey: await env.KV_BINDING.get('API_KEY'),
     defaultStrategies: await env.KV_BINDING.get('DEFAULT_STRATEGIES'),
     defaultPredictionCount: await env.KV_BINDING.get('DEFAULT_PREDICTION_COUNT')
@@ -27,9 +30,16 @@ async function getConfig(env) {
   // 如果 KV 中没有配置，尝试从环境变量获取（兼容性）
   if (!config.telegramBotToken) config.telegramBotToken = env.TELEGRAM_BOT_TOKEN;
   if (!config.telegramChatId) config.telegramChatId = env.TELEGRAM_CHAT_ID;
+  if (!config.telegramChannelId) config.telegramChannelId = env.TELEGRAM_CHANNEL_ID;
+  if (!config.telegramSendToBot) config.telegramSendToBot = env.TELEGRAM_SEND_TO_BOT || 'true';
+  if (!config.telegramSendToChannel) config.telegramSendToChannel = env.TELEGRAM_SEND_TO_CHANNEL || 'false';
   if (!config.apiKey) config.apiKey = env.API_KEY;
   if (!config.defaultStrategies) config.defaultStrategies = env.DEFAULT_STRATEGIES || 'frequency';
   if (!config.defaultPredictionCount) config.defaultPredictionCount = parseInt(env.DEFAULT_PREDICTION_COUNT || '5');
+  
+  // 转换布尔值
+  config.telegramSendToBot = config.telegramSendToBot.toLowerCase() === 'true';
+  config.telegramSendToChannel = config.telegramSendToChannel.toLowerCase() === 'true';
   
   return config;
 }
@@ -227,7 +237,7 @@ async function runDailyTask(env) {
   const maxTaskTime = 8000; // 全局任务最大执行时间 8 秒（免费计划优化）
   
   const config = await getConfig(env);
-  const telegram = new TelegramBot(config.telegramBotToken, config.telegramChatId);
+  const telegram = new TelegramBot(config.telegramBotToken, config.telegramChatId, config.telegramChannelId, config.telegramSendToBot, config.telegramSendToChannel);
   
   try {
     // 并行处理双色球和大乐透（提高性能）
@@ -851,7 +861,7 @@ export default {
     // 测试 Telegram 连接
     if (url.pathname === '/test') {
       try {
-        const telegram = new TelegramBot(config.telegramBotToken, config.telegramChatId);
+        const telegram = new TelegramBot(config.telegramBotToken, config.telegramChatId, config.telegramChannelId, config.telegramSendToBot, config.telegramSendToChannel);
         const success = await telegram.testConnection();
         
         if (success) {
