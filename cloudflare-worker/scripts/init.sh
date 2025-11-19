@@ -23,7 +23,7 @@ fi
 
 # 配置（可在 .env 文件中覆盖）
 SLEEP_TIME=${SLEEP_TIME:-30}  # 优化：减少等待时间到30秒
-MAX_NO_NEW_DATA=2  # 优化：连续2次没有数据就停止
+MAX_NO_NEW_DATA=3  # 优化：连续3次没有数据就停止（考虑跨年情况）
 DAILY_REQUEST_LIMIT=${DAILY_REQUEST_LIMIT:-1000}  # 优化：增加每日限制（小批量处理）
 AUTO_CONTINUE=${AUTO_CONTINUE:-false}  # 是否自动跨天继续
 

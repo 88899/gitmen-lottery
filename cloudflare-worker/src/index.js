@@ -515,27 +515,16 @@ export default {
           // 网站API返回空数据，需要判断是否应该跨年
           const currentTotal = await db.getCount(type);
           
-          // 检查当前批次是否需要跨年
-          const currentYear = parseInt(startIssue.substring(0, 2));
-          const currentIssueNum = parseInt(startIssue.substring(2));
-          const endIssueNum = parseInt(endIssue.substring(2));
-          
-          // 跨年判断逻辑：
-          // 关键修复：如果当前批次无数据，且不是第一年（2003），就应该尝试跨年
-          // 因为每年的期号数量不固定，保守策略是遇到无数据就跨年尝试
-          const currentYearFull = 2000 + currentYear;
-          const isFirstYear = (currentYearFull === 2003); // 双色球起始年份
-          
-          // 跨年策略：
-          // 1. 如果不是起始年份，无数据时就跨年（因为前面年份肯定有数据）
-          // 2. 如果是起始年份，但期号 > 100，也跨年（2003年确实有100+期）
-          const shouldCrossYear = !isFirstYear || currentIssueNum > 100;
+          // 最简单的跨年策略：无数据就跨年
+          // 理由：期数不固定（1期到100+期都可能），复杂判断容易出错
+          // 让脚本层面的连续无数据计数器控制最终停止
+          const shouldCrossYear = true;
           
           console.log(`\n========================================`);
           console.log(`⚠️  ${modules.name} 本批次无数据`);
           console.log(`   查询范围: ${startIssue} - ${endIssue}`);
           console.log(`   当前总计: ${currentTotal} 条`);
-          console.log(`   跨年检查: ${shouldCrossYear ? '是' : '否'} (当前年份: ${currentYearFull}, 起始期号: ${currentIssueNum})`);
+          console.log(`   跨年策略: 无数据就跨年`);
           console.log(`========================================\n`);
           
           return new Response(
@@ -555,7 +544,7 @@ export default {
               },
               hasMore: shouldCrossYear, // 如果需要跨年，继续爬取
               needsCrossYear: shouldCrossYear,
-              currentYear: currentYearFull,
+              currentYear: parseInt(startIssue.substring(0, 2)) + 2000,
               note: shouldCrossYear ? 
                 '当年数据爬取完成，建议跨年继续爬取' : 
                 '本批次无数据，初始化完成'
