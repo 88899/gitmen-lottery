@@ -629,7 +629,7 @@ echo ""
 # ============================================================================
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}第七部分：Cloudflare Worker API 端点测试${NC}"
+echo -e "${BLUE}第七部分：Cloudflare Worker 初始化和 API 端点测试${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
 # 检查 Worker URL 配置
@@ -637,17 +637,22 @@ WORKER_URL=$(grep "WORKER_URL" cloudflare-worker/.env 2>/dev/null | cut -d'=' -f
 API_KEY=$(grep "API_KEY" cloudflare-worker/.env 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
 
 if [ -z "$WORKER_URL" ] || [ "$WORKER_URL" = "https://your-worker.workers.dev" ]; then
-    echo "⚠️  Worker URL 未配置或为默认值，跳过 API 测试"
+    echo "⚠️  Worker URL 未配置或为默认值，跳过 Worker 测试"
     echo "   请在 cloudflare-worker/.env 中配置 WORKER_URL"
     echo ""
 else
-    echo "📊 测试 Worker API 端点..."
+    echo "📊 测试 Worker 初始化和 API 端点..."
     echo "   Worker URL: $WORKER_URL"
     echo ""
     
+    # ========================================================================
+    # 第一步：验证 Worker 连接（无依赖）
+    # ========================================================================
+    echo "  [步骤 1/4] 验证 Worker 连接..."
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
     # 测试 GET /test 端点
     echo "  执行: GET /test"
-    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     RESPONSE=$(curl -s "$WORKER_URL/test" 2>&1)
     echo "$RESPONSE" | tee -a "$LOG_FILE"
     if echo "$RESPONSE" | grep -q "success\|test"; then
@@ -657,6 +662,71 @@ else
         echo "  ✗ GET /test 执行失败"
         ((FAILED++))
     fi
+    echo ""
+    
+    # ========================================================================
+    # 第二步：通过 init.sh 初始化数据库（必须在查询数据之前！）
+    # ========================================================================
+    echo "  [步骤 2/4] 通过 init.sh 初始化 Worker 数据库..."
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    INIT_SCRIPT="cloudflare-worker/scripts/init.sh"
+    if [ -f "$INIT_SCRIPT" ] && [ -x "$INIT_SCRIPT" ]; then
+        # 测试 1: 不带参数 - 全量初始化所有彩票类型
+        echo "  [2.1] 执行: $INIT_SCRIPT (不带参数，全量初始化所有彩票类型)"
+        timeout 300 bash "$INIT_SCRIPT" 2>&1 | tee -a "$LOG_FILE" | tail -30
+        
+        if [ $? -eq 0 ]; then
+            echo "  ✓ init.sh 全量初始化成功"
+            ((PASSED++))
+        else
+            echo "  ⚠️  init.sh 全量初始化可能失败或超时"
+        fi
+        echo ""
+        
+        # 测试 2: 带参数 - 初始化指定的彩票类型（验证参数功能）
+        echo "  [2.2] 执行: $INIT_SCRIPT {type} (带参数，验证所有彩票类型)"
+        for lottery in ssq dlt qxc qlc; do
+            echo "    执行: $INIT_SCRIPT $lottery"
+            timeout 60 bash "$INIT_SCRIPT" "$lottery" 2>&1 | tee -a "$LOG_FILE" | tail -5
+            
+            if [ $? -eq 0 ]; then
+                echo "    ✓ init.sh $lottery 初始化成功"
+                ((PASSED++))
+            else
+                echo "    ⚠️  init.sh $lottery 初始化可能失败或超时"
+            fi
+            echo ""
+        done
+    else
+        echo "  ⚠️  init.sh 脚本不存在或不可执行，跳过脚本初始化"
+    fi
+    echo ""
+    
+    # ========================================================================
+    # 第三步：测试每日任务（POST /run）
+    # ========================================================================
+    echo "  [步骤 3/4] 测试每日任务（POST /run）..."
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    echo "  执行: POST /run (执行每日任务：爬取+预测+通知)"
+    RESPONSE=$(curl -s -X POST "$WORKER_URL/run" \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "Content-Type: application/json" 2>&1)
+    echo "$RESPONSE" | tee -a "$LOG_FILE"
+    if echo "$RESPONSE" | grep -q "success\|complete"; then
+        echo "  ✓ POST /run 执行成功"
+        ((PASSED++))
+    else
+        echo "  ⚠️  POST /run 执行可能失败"
+    fi
+    echo ""
+    
+    # ========================================================================
+    # 第四步：查询数据（依赖于前面的初始化和任务执行）
+    # ========================================================================
+    echo "  [步骤 4/4] 查询数据..."
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     
     # 测试 GET /latest 端点
