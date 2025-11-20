@@ -170,8 +170,11 @@ async function smartFetch(type, env, options = {}) {
       const startIssueNum = lastIssueNum + 1;
       startIssue = `${yearShort}${startIssueNum.toString().padStart(3, '0')}`;
       
-      // 计算结束期号（小批量）
-      const endIssueNum = Math.min(BATCH_SIZE, 200);
+      // 计算结束期号：start + 批次大小 - 1，但不超过200
+      let endIssueNum = startIssueNum + BATCH_SIZE - 1;
+      if (endIssueNum > 200) {
+        endIssueNum = 200;
+      }
       endIssue = `${yearShort}${endIssueNum.toString().padStart(3, '0')}`;
       console.log(`数据库为空，从最后期号 ${lastIssue} 的下一期 ${startIssue} 开始`);
     }
@@ -192,11 +195,12 @@ async function smartFetch(type, env, options = {}) {
       const nextYearShort = nextYear.toString().substring(2);
       
       // 计算跨年后的新查询范围
-      // 使用最后期号的后三位 +1 作为跨年的起始期号
-      const lastIssueNum = parseInt(modules.lastIssue.substring(2));
-      const crossYearStartNum = lastIssueNum + 1;
+      // 关键：跨年时应该从下一年的起始期号开始，而不是从 lastIssue 的期号开始
+      // 例如：双色球从 03001 开始，跨年后应该从 04001 开始
+      // 例如：七星彩从 04101 开始，跨年后应该从 05101 开始
+      const crossYearStartNum = 1;  // 下一年的第一期
       const crossYearStart = `${nextYearShort}${crossYearStartNum.toString().padStart(3, '0')}`;
-      const crossYearEnd = `${nextYearShort}${Math.min(BATCH_SIZE, 200).toString().padStart(3, '0')}`;
+      const crossYearEnd = `${nextYearShort}${Math.min(crossYearStartNum + BATCH_SIZE - 1, 200).toString().padStart(3, '0')}`;
       
       console.log(`第${retryCount}次重试：${startIssue}-${endIssue} 无数据，跨年到 ${crossYearStart}-${crossYearEnd}`);
       

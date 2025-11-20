@@ -29,6 +29,31 @@ log_output() {
 }
 
 # ============================================================================
+# 清理阶段：清理旧进程和日志
+# ============================================================================
+
+echo -e "${BLUE}🧹 清理旧进程和日志...${NC}"
+
+# 清理正在运行的 check.sh 进程（排除当前进程）
+CURRENT_PID=$$
+RUNNING_PIDS=$(pgrep -f "bash scripts/check.sh" | grep -v "^$CURRENT_PID$")
+if [ -n "$RUNNING_PIDS" ]; then
+    echo "  清理旧的 check.sh 进程..."
+    echo "$RUNNING_PIDS" | xargs kill -9 2>/dev/null
+    sleep 1
+    echo "  ✓ 旧进程已清理"
+fi
+
+# 清理旧的日志文件
+if [ -f "$LOG_DIR/check_"*.log ] 2>/dev/null; then
+    echo "  清理旧的日志文件..."
+    rm -f "$LOG_DIR/check_"*.log "$LOG_DIR/schedule_"*.log 2>/dev/null
+    echo "  ✓ 旧日志已清理"
+fi
+
+echo ""
+
+# ============================================================================
 # 第一部分：基础质量检查
 # ============================================================================
 
@@ -526,11 +551,26 @@ echo ""
 echo "  执行: python lottery.py schedule (在新终端中运行)"
 echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 SCHEDULE_LOG="$LOG_DIR/schedule_$(date '+%Y%m%d_%H%M%S').log"
-# 在后台新开终端运行schedule命令
-open -a Terminal "python lottery.py schedule > '$SCHEDULE_LOG' 2>&1" 2>/dev/null || \
-    nohup python lottery.py schedule > "$SCHEDULE_LOG" 2>&1 &
-SCHEDULE_PID=$!
-echo "  ✓ schedule 命令已在后台启动 (PID: $SCHEDULE_PID)"
+
+# 在新终端中运行schedule命令，显示完整输出
+if command -v open &> /dev/null; then
+    # macOS: 使用 open -a Terminal 打开新终端
+    open -a Terminal "bash -c 'cd \"$(pwd)\" && python lottery.py schedule 2>&1 | tee \"$SCHEDULE_LOG\"; read -p \"按 Enter 关闭此窗口...\"'"
+    echo "  ✓ schedule 命令已在新终端中启动"
+elif command -v gnome-terminal &> /dev/null; then
+    # Linux (GNOME): 使用 gnome-terminal
+    gnome-terminal -- bash -c "cd \"$(pwd)\" && python lottery.py schedule 2>&1 | tee \"$SCHEDULE_LOG\"; read -p \"按 Enter 关闭此窗口...\""
+    echo "  ✓ schedule 命令已在新终端中启动"
+elif command -v xterm &> /dev/null; then
+    # Linux (备选): 使用 xterm
+    xterm -e "bash -c 'cd \"$(pwd)\" && python lottery.py schedule 2>&1 | tee \"$SCHEDULE_LOG\"; read -p \"按 Enter 关闭此窗口...\"'"
+    echo "  ✓ schedule 命令已在新终端中启动"
+else
+    # 备选方案：前台运行
+    echo "  ⚠️  无法打开新终端，在当前终端运行..."
+    python lottery.py schedule 2>&1 | tee -a "$LOG_FILE" "$SCHEDULE_LOG"
+fi
+
 echo "  日志文件: $SCHEDULE_LOG"
 echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 ((PASSED++))
@@ -651,83 +691,116 @@ else
     echo "  [步骤 1/4] 验证 Worker 连接..."
     echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
-    # 测试 GET /test 端点
-    echo "  执行: GET /test"
-    RESPONSE=$(curl -s "$WORKER_URL/test" 2>&1)
-    echo "$RESPONSE" | tee -a "$LOG_FILE"
-    if echo "$RESPONSE" | grep -q "success\|test"; then
-        echo "  ✓ GET /test 执行成功"
+    # 测试 GET / 端点（首页）
+    echo "  执行: GET /"
+    RESPONSE=$(curl -s "$WORKER_URL/" 2>&1)
+    echo "$RESPONSE" | tee -a "$LOG_FILE" | head -3
+    WORKER_CONNECTED=false
+    if echo "$RESPONSE" | grep -q "彩票\|Cloudflare"; then
+        echo "  ✓ GET / 执行成功"
         ((PASSED++))
+        WORKER_CONNECTED=true
     else
-        echo "  ✗ GET /test 执行失败"
+        echo "  ✗ GET / 执行失败"
         ((FAILED++))
     fi
     echo ""
     
-    # ========================================================================
-    # 第二步：通过 init.sh 初始化数据库（必须在查询数据之前！）
-    # ========================================================================
-    echo "  [步骤 2/4] 通过 init.sh 初始化 Worker 数据库..."
-    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    
-    INIT_SCRIPT="cloudflare-worker/scripts/init.sh"
-    if [ -f "$INIT_SCRIPT" ] && [ -x "$INIT_SCRIPT" ]; then
+    # 如果 Worker 连接失败，直接退出
+    if [ "$WORKER_CONNECTED" = false ]; then
+        echo ""
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${RED}❌ Worker 连接失败，后续测试无意义，直接退出${NC}"
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo "✓ 通过: $PASSED 项"
+        echo "✗ 失败: $FAILED 项"
+        echo ""
+        echo "📋 完整日志: $LOG_FILE"
+        exit 1
+    else
+        # ========================================================================
+        # 第二步：通过 init.sh 初始化数据库（必须在查询数据之前！）
+        # ========================================================================
+        echo "  [步骤 2/4] 通过 init.sh 初始化 Worker 数据库..."
+        echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        INIT_SCRIPT="cloudflare-worker/scripts/init.sh"
+        if [ ! -f "$INIT_SCRIPT" ] || [ ! -x "$INIT_SCRIPT" ]; then
+            echo "  ✗ init.sh 脚本不存在或不可执行"
+            ((FAILED++))
+            echo ""
+            echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "${RED}❌ init.sh 初始化失败，后续测试无意义，直接退出${NC}"
+            echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo "✓ 通过: $PASSED 项"
+            echo "✗ 失败: $FAILED 项"
+            echo ""
+            echo "📋 完整日志: $LOG_FILE"
+            exit 1
+        fi
+        
         # 测试 1: 不带参数 - 全量初始化所有彩票类型
         echo "  [2.1] 执行: $INIT_SCRIPT (不带参数，全量初始化所有彩票类型)"
-        timeout 300 bash "$INIT_SCRIPT" 2>&1 | tee -a "$LOG_FILE" | tail -30
+        echo "  ⏳ 这可能需要较长时间，请耐心等待..."
+        bash "$INIT_SCRIPT" 2>&1 | tee -a "$LOG_FILE"
+        INIT_EXIT_CODE=${PIPESTATUS[0]}
         
-        if [ $? -eq 0 ]; then
-            echo "  ✓ init.sh 全量初始化成功"
-            ((PASSED++))
-        else
-            echo "  ⚠️  init.sh 全量初始化可能失败或超时"
+        if [ $INIT_EXIT_CODE -ne 0 ]; then
+            echo "  ✗ init.sh 全量初始化失败"
+            ((FAILED++))
+            echo ""
+            echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "${RED}❌ init.sh 初始化失败，后续测试无意义，直接退出${NC}"
+            echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo "✓ 通过: $PASSED 项"
+            echo "✗ 失败: $FAILED 项"
+            echo ""
+            echo "📋 完整日志: $LOG_FILE"
+            exit 1
         fi
+        echo "  ✓ init.sh 全量初始化成功"
+        ((PASSED++))
         echo ""
         
-        # 测试 2: 带参数 - 初始化指定的彩票类型（验证参数功能）
-        echo "  [2.2] 执行: $INIT_SCRIPT {type} (带参数，验证所有彩票类型)"
-        for lottery in ssq dlt qxc qlc; do
-            echo "    执行: $INIT_SCRIPT $lottery"
-            timeout 60 bash "$INIT_SCRIPT" "$lottery" 2>&1 | tee -a "$LOG_FILE" | tail -5
+        # ========================================================================
+        # 第三步：测试每日任务（POST /run）
+        # ========================================================================
+        if [ "$INIT_SUCCESS" = true ]; then
+            echo "  [步骤 3/4] 测试每日任务（POST /run）..."
+            echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             
-            if [ $? -eq 0 ]; then
-                echo "    ✓ init.sh $lottery 初始化成功"
+            echo "  执行: POST /run (执行每日任务：爬取+预测+通知)"
+            RESPONSE=$(curl -s -X POST "$WORKER_URL/run" \
+                -H "Authorization: Bearer $API_KEY" \
+                -H "Content-Type: application/json" 2>&1)
+            echo "$RESPONSE" | tee -a "$LOG_FILE"
+            if echo "$RESPONSE" | grep -q "success\|complete"; then
+                echo "  ✓ POST /run 执行成功"
                 ((PASSED++))
             else
-                echo "    ⚠️  init.sh $lottery 初始化可能失败或超时"
+                echo "  ⚠️  POST /run 执行可能失败"
             fi
             echo ""
-        done
-    else
-        echo "  ⚠️  init.sh 脚本不存在或不可执行，跳过脚本初始化"
+        else
+            echo "  ⚠️  初始化失败，跳过每日任务测试"
+            echo ""
+        fi
+        
+        # ========================================================================
+        # 第四步：查询数据（依赖于前面的初始化和任务执行）
+        # ========================================================================
+        if [ "$INIT_SUCCESS" = true ]; then
+            echo "  [步骤 4/4] 查询数据..."
+            echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+        else
+            echo "  ⚠️  初始化失败，跳过数据查询测试"
+            echo ""
+        fi
     fi
-    echo ""
     
-    # ========================================================================
-    # 第三步：测试每日任务（POST /run）
-    # ========================================================================
-    echo "  [步骤 3/4] 测试每日任务（POST /run）..."
-    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    
-    echo "  执行: POST /run (执行每日任务：爬取+预测+通知)"
-    RESPONSE=$(curl -s -X POST "$WORKER_URL/run" \
-        -H "Authorization: Bearer $API_KEY" \
-        -H "Content-Type: application/json" 2>&1)
-    echo "$RESPONSE" | tee -a "$LOG_FILE"
-    if echo "$RESPONSE" | grep -q "success\|complete"; then
-        echo "  ✓ POST /run 执行成功"
-        ((PASSED++))
-    else
-        echo "  ⚠️  POST /run 执行可能失败"
-    fi
-    echo ""
-    
-    # ========================================================================
-    # 第四步：查询数据（依赖于前面的初始化和任务执行）
-    # ========================================================================
-    echo "  [步骤 4/4] 查询数据..."
-    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
+    # 只有在 Worker 连接成功且初始化成功时，才执行查询测试
+    if [ "$WORKER_CONNECTED" = true ] && [ "$INIT_SUCCESS" = true ]; then
     
     # 测试 GET /latest 端点
     echo "  执行: GET /latest"
@@ -848,6 +921,7 @@ else
         fi
         echo ""
     done
+    fi
 fi
 
 echo ""

@@ -6,7 +6,9 @@ export class QXCSpider {
   constructor() {
     this.baseUrl = 'https://datachart.500.com/qxc/history/inc/history.php';
     this.headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://www.500.com/',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
     };
   }
 
@@ -79,36 +81,75 @@ export class QXCSpider {
   parse500Html(html, latestOnly = false) {
     const data = [];
     
-    // 使用更灵活的正则表达式，不依赖于<span>标签
-    // 匹配: <tr...> ... <td...>期号</td><td...>号码</td> ... <td...>日期</td>
-    const rowRegex = /<tr[^>]*>.*?<td[^>]*>(\d+)<\/td><td[^>]*>([\d\s]+)<\/td>.*?<td[^>]*>[\d,]+<\/td>.*?<td[^>]*>[\d,]+<\/td>.*?<td[^>]*>([\d-]+)<\/td>/gs;
-    
-    let match;
-    while ((match = rowRegex.exec(html)) !== null) {
-      const lotteryNo = match[1];
-      const numbersStr = match[2].trim();
-      const drawDate = match[3];
+    try {
+      // 提取表格数据
+      const tbodyMatch = html.match(/<tbody[^>]*id="tdata"[^>]*>([\s\S]*?)<\/tbody>/i);
       
-      // 补全期号为7位
-      const fullLotteryNo = lotteryNo.length === 5 ? '20' + lotteryNo : lotteryNo;
-      
-      // 解析7个数字
-      const numbers = numbersStr.split(/\s+/).map(n => parseInt(n)).filter(n => !isNaN(n));
-      
-      if (numbers.length === 7) {
-        data.push({
-          lottery_no: fullLotteryNo,
-          draw_date: drawDate,
-          numbers: numbers
-        });
+      if (!tbodyMatch) {
+        console.log('未找到数据表格');
+        return data;
       }
       
-      if (latestOnly && data.length > 0) {
-        break;
+      const tbody = tbodyMatch[1];
+      const cleanTbody = tbody.replace(/<!--[\s\S]*?-->/g, '');
+      
+      // 提取每一行
+      const trMatches = cleanTbody.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi);
+      
+      for (const trMatch of trMatches) {
+        const tr = trMatch[1];
+        const tdMatches = [...tr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
+        
+        if (tdMatches.length < 10) continue;
+        
+        try {
+          const texts = tdMatches.map(m => m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').replace(/,/g, '').trim());
+          
+          let lotteryNo = texts[0];
+          if (lotteryNo && /^\d{5}$/.test(lotteryNo)) {
+            lotteryNo = '20' + lotteryNo;
+          }
+          
+          // 七星彩：7个数字
+          const numbers = texts.slice(1, 8).filter(t => t && /^\d+$/.test(t)).map(t => parseInt(t));
+          const drawDate = texts[texts.length - 1];
+          
+          if (lotteryNo && 
+              numbers.length === 7 && 
+              drawDate &&
+              /^\d{7}$/.test(lotteryNo) &&
+              /^\d{4}-\d{2}-\d{2}$/.test(drawDate)) {
+            
+            data.push({
+              lottery_no: lotteryNo,
+              draw_date: drawDate,
+              num1: String(numbers[0]),
+              num2: String(numbers[1]),
+              num3: String(numbers[2]),
+              num4: String(numbers[3]),
+              num5: String(numbers[4]),
+              num6: String(numbers[5]),
+              num7: String(numbers[6]),
+              sorted_code: [...numbers].sort((a,b) => a-b).map(n => String(n).padStart(2, '0')).join(',')
+            });
+            
+            if (latestOnly && data.length === 1) {
+              console.log(`成功解析最新数据: ${lotteryNo}`);
+              return data;
+            }
+          }
+        } catch (e) {
+          console.error('解析行数据失败:', e);
+        }
       }
+      
+      if (!latestOnly) {
+        console.log(`成功解析 ${data.length} 条七星彩数据`);
+      }
+    } catch (error) {
+      console.error('解析 HTML 失败:', error);
     }
     
-    console.log(`成功解析 ${data.length} 条七星彩数据`);
     return data;
   }
 
