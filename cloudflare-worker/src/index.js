@@ -204,7 +204,10 @@ async function smartFetch(type, env, options = {}) {
     
     const currentTotal = await db.getCount(type);
     const hasNewData = inserted > 0;
-    const needsCrossYear = !hasNewData && retryCount < maxRetries;
+    // 修复：只有在没有重试过且没有数据时才需要跨年
+    const needsCrossYear = !hasNewData && retryCount === 0 && maxRetries > 0;
+    // 修复：只有有新数据时才认为还有更多数据，跨年建议不算 hasMore
+    const hasMore = hasNewData;
     
     return {
       success: true,
@@ -218,7 +221,7 @@ async function smartFetch(type, env, options = {}) {
         start: startIssue,
         end: endIssue
       },
-      hasMore: hasNewData || needsCrossYear,
+      hasMore: hasMore,
       needsCrossYear: needsCrossYear,
       hasNewData: hasNewData,
       retryCount: retryCount,
@@ -236,6 +239,43 @@ async function smartFetch(type, env, options = {}) {
       error: error.message
     };
   }
+}
+
+/**
+ * 构建预测消息
+ */
+function buildPredictionMessage(lotteryName, lotteryType, predictions) {
+  let message = `🔮 ${lotteryName}预测\n`;
+  
+  // 预测结果
+  if (predictions && Array.isArray(predictions) && predictions.length > 0) {
+    for (let i = 0; i < predictions.length; i++) {
+      const pred = predictions[i];
+      const strategyName = pred.strategy_name || pred.strategy || '未知策略';
+      
+      message += `组合 ${i + 1}: [${strategyName}]\n`;
+      
+      if (lotteryType === 'ssq') {
+        const redStr = pred.red_balls.map(b => String(b).padStart(2, '0')).join(' ');
+        message += `🔴 红球: ${redStr}\n`;
+        message += `🔵 蓝球: ${String(pred.blue_ball).padStart(2, '0')}\n\n`;
+      } else {
+        const frontStr = pred.front_balls.map(b => String(b).padStart(2, '0')).join(' ');
+        const backStr = pred.back_balls.map(b => String(b).padStart(2, '0')).join(' ');
+        message += `🔴 前区: ${frontStr}\n`;
+        message += `🔵 后区: ${backStr}\n\n`;
+      }
+    }
+  } else {
+    // 没有预测结果时的提示
+    message += `⚠️ 暂时无法生成预测\n`;
+    message += `请稍后再试或检查数据状态\n`;
+  }
+  
+  message += `━━━━━━━━━━━━━━━\n`;
+  message += `⚠️ 仅供参考，理性购彩`;
+  
+  return message;
 }
 
 /**
@@ -359,44 +399,15 @@ async function runDailyTask(env) {
     
     // 总是发送 Telegram 通知（无论是否有新数据，只要处理成功就发送）
     const results = [ssqResult, dltResult].filter(r => r.success);
-    // 构建所有消息
+    
+    // 构建所有消息（使用统一的消息构建函数）
     const messages = results.map(result => {
       // 检查是否有预测结果
       if (!result.predictions || result.predictions.length === 0) {
         console.warn(`${result.name} 无预测结果，但仍然发送通知`);
       }
       
-      // 构建单个彩票类型的消息（简洁格式）
-      let message = `🔮 ${result.name}预测\n`;
-      
-      // 预测结果
-      if (result.predictions && Array.isArray(result.predictions) && result.predictions.length > 0) {
-        for (let i = 0; i < result.predictions.length; i++) {
-          const pred = result.predictions[i];
-          const strategyName = pred.strategy_name || pred.strategy || '未知策略';
-          
-          message += `组合 ${i + 1}: [${strategyName}]\n`;
-          
-          if (result.type === 'ssq') {
-            const redStr = pred.red_balls.map(b => String(b).padStart(2, '0')).join(' ');
-            message += `🔴 红球: ${redStr}\n`;
-            message += `🔵 蓝球: ${String(pred.blue_ball).padStart(2, '0')}\n`;
-          } else {
-            const frontStr = pred.front_balls.map(b => String(b).padStart(2, '0')).join(' ');
-            const backStr = pred.back_balls.map(b => String(b).padStart(2, '0')).join(' ');
-            message += `🔴 前区: ${frontStr}\n`;
-            message += `🔵 后区: ${backStr}\n`;
-          }
-        }
-      } else {
-        // 没有预测结果时的提示
-        message += `⚠️ 暂时无法生成预测\n`;
-        message += `请稍后再试或检查数据状态\n`;
-      }
-      
-      message += `━━━━━━━━━━━━━━━\n`;
-      message += `⚠️ 仅供参考，理性购彩`;
-      
+      const message = buildPredictionMessage(result.name, result.type, result.predictions);
       return { name: result.name, content: message };
     });
     
@@ -670,6 +681,13 @@ export default {
     if (url.pathname.startsWith('/predict')) {
       try {
         const db = new Database(env.DB);
+        const telegram = new TelegramBot(
+          config.telegramBotToken,
+          config.telegramChatId,
+          config.telegramChannelId,
+          config.telegramSendToBot,
+          config.telegramSendToChannel
+        );
         
         // 获取参数
         const countParam = url.searchParams.get('count');
@@ -694,6 +712,12 @@ export default {
           const predictor = new modules.predictor(db);
           const predictions = await predictor.predict(count, strategies);
           
+          // 发送 Telegram 通知
+          const message = buildPredictionMessage(modules.name, type, predictions);
+          await telegram.sendMessage(message).catch(err => 
+            console.error('Telegram 通知发送失败:', err)
+          );
+          
           return new Response(JSON.stringify({
             lottery_type: type,
             lottery_name: modules.name,
@@ -717,6 +741,20 @@ export default {
               predictions: predictions
             });
           }
+          
+          // 并行发送所有 Telegram 通知
+          const messages = allPredictions.map(pred => ({
+            name: pred.lottery_name,
+            content: buildPredictionMessage(pred.lottery_name, pred.lottery_type, pred.predictions)
+          }));
+          
+          await Promise.all(
+            messages.map(msg => 
+              telegram.sendMessage(msg.content)
+                .then(() => console.log(`✓ ${msg.name} Telegram 通知已发送`))
+                .catch(err => console.error(`✗ ${msg.name} Telegram 通知发送失败:`, err))
+            )
+          );
           
           return new Response(JSON.stringify(allPredictions, null, 2), {
             headers: { 'Content-Type': 'application/json; charset=utf-8' }

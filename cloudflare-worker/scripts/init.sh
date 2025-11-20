@@ -239,9 +239,9 @@ while true; do
       echo "⚠️  本批次没有新增数据（连续 $no_new_data_count 次）"
       
       # 检查是否需要跨年
-      needsCrossYear=$(echo "$response" | jq -r '.needsCrossYear // false' 2>/dev/null)
+      needsCrossYear=$(echo "$response" | jq -r 'if .needsCrossYear == null then false else .needsCrossYear end' 2>/dev/null)
       currentYear=$(echo "$response" | jq -r '.currentYear // 0' 2>/dev/null)
-      hasMore=$(echo "$response" | jq -r '.hasMore // true' 2>/dev/null)
+      hasMore=$(echo "$response" | jq -r 'if .hasMore == null then true else .hasMore end' 2>/dev/null)
       
       if [ "$needsCrossYear" = "true" ]; then
         echo "📅 检测到年底，当前年份: $currentYear"
