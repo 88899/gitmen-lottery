@@ -28,6 +28,20 @@ def get_lottery_modules(lottery_type: str):
             'spider_class': 'lotteries.dlt.spider.DLTSpider',
             'database_class': 'lotteries.dlt.database.DLTDatabase',
             'predictor_class': 'lotteries.dlt.predictor.DLTPredictor'
+        },
+        'qxc': {
+            'name': '七星彩',
+            'start_year': 2004,
+            'spider_class': 'lotteries.qxc.spider.QXCSpider',
+            'database_class': 'lotteries.qxc.database.QXCDatabase',
+            'predictor_class': 'lotteries.qxc.predictor.QXCPredictor'
+        },
+        'qlc': {
+            'name': '七乐彩',
+            'start_year': 2007,
+            'spider_class': 'lotteries.qlc.spider.QLCSpider',
+            'database_class': 'lotteries.qlc.database.QLCDatabase',
+            'predictor_class': 'lotteries.qlc.predictor.QLCPredictor'
         }
     }
     
@@ -49,7 +63,7 @@ def smart_fetch(lottery_type: str, mode: str = 'incremental', **options) -> Dict
     统一的智能爬取方法
     
     Args:
-        lottery_type: 彩票类型 ('ssq' 或 'dlt')
+        lottery_type: 彩票类型 ('ssq', 'dlt', 'qxc' 或 'qlc')
         mode: 爬取模式 ('incremental' 增量, 'full' 全量, 'year' 指定年份)
         **options: 其他选项
             - target_year: 指定年份（mode='year' 时使用）
@@ -176,7 +190,7 @@ def _fetch_incremental(spider, db, modules, lottery_type, **options) -> Dict:
 
 
 def _fetch_full_history(spider, db, modules, lottery_type, **options) -> Dict:
-    """全量爬取逻辑（逐年推进）"""
+    """全量爬取逻辑（按年份推进，自动查找缺失年份）"""
     start_year = modules['start_year']
     current_year = datetime.now().year
     

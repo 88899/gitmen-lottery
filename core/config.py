@@ -75,14 +75,14 @@ SECURITY_CONFIG = {
 }
 
 # 支持的彩票类型
-SUPPORTED_LOTTERIES = ['ssq', 'dlt', 'ks3', 'sdlt']
+SUPPORTED_LOTTERIES = ['ssq', 'dlt', 'qxc', 'qlc']
 
 # 彩票名称映射
 LOTTERY_NAMES = {
     'ssq': '双色球',
     'dlt': '大乐透',
-    'ks3': '快开3',
-    'sdlt': '超级大乐透',
+    'qxc': '七星彩',
+    'qlc': '七乐彩',
 }
 
 # 预测配置

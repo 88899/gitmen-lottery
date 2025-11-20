@@ -2,7 +2,7 @@
 
 ## 概述
 
-`init.sh` 脚本用于批量导入历史数据，支持双色球和大乐透。
+`init.sh` 脚本用于批量导入历史数据，支持双色球、大乐透和七星彩。
 
 ## 更新内容 ✅
 
@@ -210,7 +210,7 @@ Worker URL: https://your-worker.workers.dev
    - 验证 Worker URL 和 API Key
 
 2. **验证彩票类型**
-   - 检查参数是否为 `ssq` 或 `dlt`
+   - 检查参数是否为 `ssq`、`dlt`、`qxc` 或 `qlc`
    - 设置对应的彩票名称
 
 3. **循环爬取**

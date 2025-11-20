@@ -2,12 +2,14 @@
 
 ## 概述
 
-彩票预测系统的 Cloudflare Worker 版本，支持双色球和大乐透。
+彩票预测系统的 Cloudflare Worker 版本，支持双色球、大乐透、七星彩和七乐彩。
 
 ## 支持的彩票类型
 
 - **ssq** - 双色球
 - **dlt** - 大乐透
+- **qxc** - 七星彩
+- **qlc** - 七乐彩
 
 ## 快速开始
 
@@ -45,6 +47,7 @@ wrangler kv:key put --binding=KV_BINDING DEFAULT_PREDICTION_COUNT "15"
 # 或指定类型
 ./scripts/init.sh ssq    # 仅双色球
 ./scripts/init.sh dlt    # 仅大乐透
+./scripts/init.sh qxc    # 仅七星彩
 ```
 
 **新特性**：
@@ -66,7 +69,7 @@ GET /stats/{type}      - 查看统计信息
 GET /test              - 测试 Telegram 连接
 ```
 
-其中 `{type}` 可以是：`ssq`（双色球）或 `dlt`（大乐透）
+其中 `{type}` 可以是：`ssq`（双色球）、`dlt`（大乐透）、`qxc`（七星彩）或 `qlc`（七乐彩）
 
 ### 兼容旧接口
 
@@ -154,7 +157,7 @@ AUTO_CONTINUE=false
 
 **说明**：
 - Worker 会自动调用 `scheduled` 方法处理定时任务
-- 定时任务会自动处理所有彩票类型（双色球和大乐透）
+- 定时任务会自动处理所有彩票类型（双色球、大乐透和七星彩）
 - 无需配置多个触发器
 
 **执行流程（统一的增量爬取逻辑）**：

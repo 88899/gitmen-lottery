@@ -226,6 +226,49 @@ class TelegramBot:
             
             message += "━━━━━━━━━━━━━━━\n"
             message += "⚠️ 仅供参考，理性购彩"
+            
+        elif lottery_type == 'qxc':
+            message = "🔮 <b>七星彩预测</b>\n\n"
+            
+            for i, pred in enumerate(predictions[:5], 1):
+                numbers = pred.get('numbers', [])
+                strategy_name = pred.get('strategy_name', '')
+                
+                numbers_str = ' '.join([str(n) for n in numbers])
+                
+                message += f"<b>组合 {i}:</b>"
+                
+                if strategy_name:
+                    message += f" <i>[{strategy_name}]</i>"
+                
+                message += "\n"
+                message += f"🔢 <code>{numbers_str}</code>\n\n"
+            
+            message += "━━━━━━━━━━━━━━━\n"
+            message += "⚠️ 仅供参考，理性购彩"
+            
+        elif lottery_type == 'qlc':
+            message = "🔮 <b>七乐彩预测</b>\n\n"
+            
+            for i, pred in enumerate(predictions[:5], 1):
+                basic_balls = pred.get('basic_balls', [])
+                special_ball = pred.get('special_ball', 0)
+                strategy_name = pred.get('strategy_name', '')
+                
+                basic_str = ' '.join([f"{int(b):02d}" for b in basic_balls])
+                special_str = f"{int(special_ball):02d}"
+                
+                message += f"<b>组合 {i}:</b>"
+                
+                if strategy_name:
+                    message += f" <i>[{strategy_name}]</i>"
+                
+                message += "\n"
+                message += f"🔴 基本号: <code>{basic_str}</code>\n"
+                message += f"🔵 特别号: <code>{special_str}</code>\n\n"
+            
+            message += "━━━━━━━━━━━━━━━\n"
+            message += "⚠️ 仅供参考，理性购彩"
         else:
             message = f"预测结果: {lottery_type}"
 

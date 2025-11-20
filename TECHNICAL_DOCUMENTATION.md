@@ -26,13 +26,13 @@
 
 ### 1.1 项目简介
 
-彩票预测系统是一个基于历史数据分析的智能预测平台，支持双色球（SSQ）和大乐透（DLT）两种彩票类型。系统采用混合架构：
+彩票预测系统是一个基于历史数据分析的智能预测平台，支持双色球（SSQ）、大乐透（DLT）和七星彩（QXC）三种彩票类型。系统采用混合架构：
 - **Python 版本**：本地运行，功能完整，适合开发和测试
 - **Cloudflare Worker 版本**：云端部署，无服务器架构，适合生产环境
 
 ### 1.2 核心特性
 
-- ✅ **双彩票支持**：双色球 + 大乐透
+- ✅ **三彩票支持**：双色球 + 大乐透 + 七星彩
 - ✅ **智能爬取**：增量更新，自动跨年处理
 - ✅ **多策略预测**：频率、随机、均衡、冷热号等
 - ✅ **Telegram 通知**：支持机器人和频道推送
@@ -70,7 +70,7 @@
 
 #### FR-001: 数据爬取
 - **优先级**: P0
-- **描述**: 从 500.com 爬取双色球和大乐透历史数据
+- **描述**: 从 500.com 爬取双色球、大乐透和七星彩历史数据
 - **需求**:
   - 支持增量爬取（只爬取新数据）
   - 自动跨年处理（2025 → 2026）
@@ -387,7 +387,7 @@ async function smartFetch(type, env, options = {})
 ```
 
 **输入**:
-- `type`: 彩票类型（'ssq' | 'dlt'）
+- `type`: 彩票类型（'ssq' | 'dlt' | 'qxc'）
 - `env`: Worker 环境变量
 - `options`: 配置选项
   - `batchSize`: 批次大小（默认 50）
@@ -618,7 +618,7 @@ class TelegramBot {
 | `/test` | GET | ❌ | 测试 Telegram |
 
 **说明**:
-- `{type}` 可选值：`ssq`（双色球）、`dlt`（大乐透）
+- `{type}` 可选值：`ssq`（双色球）、`dlt`（大乐透）、`qxc`（七星彩）
 - 不指定 `{type}` 时返回所有类型
 - 认证方式：`Authorization: Bearer YOUR_API_KEY`
 
@@ -750,10 +750,11 @@ generateRedBalls(context) {
 
 #### 6.3.1 并行处理
 ```javascript
-// 并行处理双色球和大乐透
-const [ssqResult, dltResult] = await Promise.all([
+// 并行处理三种彩票
+const [ssqResult, dltResult, qxcResult] = await Promise.all([
   processSingleLottery('ssq', env, config),
-  processSingleLottery('dlt', env, config)
+  processSingleLottery('dlt', env, config),
+  processSingleLottery('qxc', env, config)
 ]);
 
 // 并行发送 Telegram 消息
@@ -2058,7 +2059,7 @@ CREATE TABLE dlt_lottery (
 | 版本 | 日期 | 更新内容 |
 |------|------|---------|
 | v1.0.0 | 2025-11-20 | 首个完整版本发布 |
-| - | - | ✅ 双色球和大乐透支持 |
+| - | - | ✅ 双色球、大乐透和七星彩支持 |
 | - | - | ✅ 智能增量爬取 |
 | - | - | ✅ 多策略预测 |
 | - | - | ✅ Telegram 通知 |

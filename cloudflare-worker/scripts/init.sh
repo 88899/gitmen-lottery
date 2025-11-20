@@ -64,11 +64,13 @@ if [ -z "$LOTTERY_TYPE" ]; then
 fi
 
 # 验证彩票类型
-if [ "$LOTTERY_TYPE" != "ssq" ] && [ "$LOTTERY_TYPE" != "dlt" ]; then
+if [ "$LOTTERY_TYPE" != "ssq" ] && [ "$LOTTERY_TYPE" != "dlt" ] && [ "$LOTTERY_TYPE" != "qxc" ] && [ "$LOTTERY_TYPE" != "qlc" ]; then
   echo "❌ 错误：不支持的彩票类型 '$LOTTERY_TYPE'"
   echo "💡 支持的类型："
   echo "   ssq - 双色球"
   echo "   dlt - 大乐透"
+  echo "   qxc - 七星彩"
+  echo "   qlc - 七乐彩"
   echo "   (空) - 所有类型"
   echo ""
   echo "使用方法："

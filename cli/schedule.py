@@ -51,6 +51,16 @@ def fetch_latest_data():
     if dlt_result:
         results.append(dlt_result)
     
+    # 处理七星彩
+    qxc_result = fetch_and_predict_single('qxc')
+    if qxc_result:
+        results.append(qxc_result)
+    
+    # 处理七乐彩
+    qlc_result = fetch_and_predict_single('qlc')
+    if qlc_result:
+        results.append(qlc_result)
+    
     # 发送 Telegram 通知
     if results:
         try:
@@ -79,11 +89,19 @@ def fetch_latest_data():
                         red_str = ' '.join([f"{int(b):02d}" for b in pred['red_balls']])
                         message += f"🔴 红球: <code>{red_str}</code>\n"
                         message += f"🔵 蓝球: <code>{int(pred['blue_ball']):02d}</code>\n\n"
-                    else:  # dlt
+                    elif result['lottery_type'] == 'dlt':
                         front_str = ' '.join([f"{int(b):02d}" for b in pred['front_balls']])
                         back_str = ' '.join([f"{int(b):02d}" for b in pred['back_balls']])
                         message += f"🔴 前区: <code>{front_str}</code>\n"
                         message += f"🔵 后区: <code>{back_str}</code>\n\n"
+                    elif result['lottery_type'] == 'qxc':
+                        numbers_str = ' '.join([str(n) for n in pred['numbers']])
+                        message += f"🔢 号码: <code>{numbers_str}</code>\n\n"
+                    elif result['lottery_type'] == 'qlc':
+                        basic_str = ' '.join([f"{int(b):02d}" for b in pred['basic_balls']])
+                        special_str = f"{int(pred['special_ball']):02d}"
+                        message += f"🔴 基本号: <code>{basic_str}</code>\n"
+                        message += f"🔵 特别号: <code>{special_str}</code>\n\n"
                 
                 message += "━━━━━━━━━━━━━━━\n"
                 message += "⚠️ 仅供参考，理性购彩"
@@ -127,7 +145,7 @@ def start_schedule(lottery_type: str = None):
         minute=30
     )
     
-    logger.info("定时任务已启动 - 每天 21:30 执行（双色球 + 大乐透）")
+    logger.info("定时任务已启动 - 每天 21:30 执行（双色球 + 大乐透 + 七星彩 + 七乐彩）")
     logger.info("按 Ctrl+C 停止")
     
     # 启动时立即执行一次

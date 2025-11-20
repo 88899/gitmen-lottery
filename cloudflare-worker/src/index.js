@@ -6,6 +6,10 @@ import { SSQSpider } from './spiders/ssq.js';
 import { SSQPredictor } from './predictors/ssq.js';
 import { DLTSpider } from './spiders/dlt.js';
 import { DLTPredictor } from './predictors/dlt.js';
+import { QXCSpider } from './spiders/qxc.js';
+import { QXCPredictor } from './predictors/qxc.js';
+import QLCSpider from './spiders/qlc.js';
+import QLCPredictor from './predictors/qlc.js';
 import { TelegramBot } from './utils/telegram.js';
 import { Database } from './utils/database.js';
 import { handleNetworkError, handleParseError, handleCriticalError } from './utils/error-handler.js';
@@ -58,6 +62,18 @@ function getLotteryModules(type) {
       spider: DLTSpider,
       predictor: DLTPredictor,
       startYear: 2007
+    },
+    qxc: {
+      name: '七星彩',
+      spider: QXCSpider,
+      predictor: QXCPredictor,
+      startYear: 2004
+    },
+    qlc: {
+      name: '七乐彩',
+      spider: QLCSpider,
+      predictor: QLCPredictor,
+      startYear: 2007
     }
   };
   
@@ -77,7 +93,7 @@ function extractLotteryType(pathname) {
   // 如果路径有两部分，第二部分是彩票类型
   if (parts.length >= 2) {
     const type = parts[1];
-    if (type === 'ssq' || type === 'dlt') {
+    if (type === 'ssq' || type === 'dlt' || type === 'qxc' || type === 'qlc') {
       return type;
     }
   }
@@ -259,11 +275,19 @@ function buildPredictionMessage(lotteryName, lotteryType, predictions) {
         const redStr = pred.red_balls.map(b => String(b).padStart(2, '0')).join(' ');
         message += `🔴 红球: ${redStr}\n`;
         message += `🔵 蓝球: ${String(pred.blue_ball).padStart(2, '0')}\n\n`;
-      } else {
+      } else if (lotteryType === 'dlt') {
         const frontStr = pred.front_balls.map(b => String(b).padStart(2, '0')).join(' ');
         const backStr = pred.back_balls.map(b => String(b).padStart(2, '0')).join(' ');
         message += `🔴 前区: ${frontStr}\n`;
         message += `🔵 后区: ${backStr}\n\n`;
+      } else if (lotteryType === 'qxc') {
+        const numbersStr = pred.numbers.map(n => String(n)).join(' ');
+        message += `🔢 号码: ${numbersStr}\n\n`;
+      } else if (lotteryType === 'qlc') {
+        const basicStr = pred.basic_balls.map(b => String(b).padStart(2, '0')).join(' ');
+        const specialStr = String(pred.special_ball).padStart(2, '0');
+        message += `🔴 基本号: ${basicStr}\n`;
+        message += `🔵 特别号: ${specialStr}\n\n`;
       }
     }
   } else {
@@ -381,10 +405,12 @@ async function runDailyTask(env) {
   const telegram = new TelegramBot(config.telegramBotToken, config.telegramChatId, config.telegramChannelId, config.telegramSendToBot, config.telegramSendToChannel);
   
   try {
-    // 并行处理双色球和大乐透（提高性能）
-    const [ssqResult, dltResult] = await Promise.all([
+    // 并行处理四种彩票（提高性能）
+    const [ssqResult, dltResult, qxcResult, qlcResult] = await Promise.all([
       processSingleLottery('ssq', env, config),
-      processSingleLottery('dlt', env, config)
+      processSingleLottery('dlt', env, config),
+      processSingleLottery('qxc', env, config),
+      processSingleLottery('qlc', env, config)
     ]);
     
     // 检查全局超时
@@ -393,12 +419,12 @@ async function runDailyTask(env) {
       return {
         success: true,
         message: '任务执行完成（超时跳过通知）',
-        results: [ssqResult, dltResult]
+        results: [ssqResult, dltResult, qxcResult, qlcResult]
       };
     }
     
     // 总是发送 Telegram 通知（无论是否有新数据，只要处理成功就发送）
-    const results = [ssqResult, dltResult].filter(r => r.success);
+    const results = [ssqResult, dltResult, qxcResult, qlcResult].filter(r => r.success);
     
     // 构建所有消息（使用统一的消息构建函数）
     const messages = results.map(result => {
@@ -426,7 +452,7 @@ async function runDailyTask(env) {
     return {
       success: true,
       message: '每日任务执行完成',
-      results: [ssqResult, dltResult]
+      results: [ssqResult, dltResult, qxcResult, qlcResult]
     };
     
   } catch (error) {
@@ -466,7 +492,9 @@ export default {
         '支持的彩票类型\n' +
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
         '  ssq - 双色球\n' +
-        '  dlt - 大乐透\n\n' +
+        '  dlt - 大乐透\n' +
+        '  qxc - 七星彩\n' +
+        '  qlc - 七乐彩\n\n' +
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
         'API 接口列表\n' +
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
@@ -475,12 +503,12 @@ export default {
         '└─────────────────────────────────────────────────────────────────┘\n' +
         '  POST /run\n' +
         '    说明: 手动执行每日任务\n' +
-        '    行为: 同时处理所有类型（双色球 + 大乐透）\n' +
+        '    行为: 同时处理所有类型（双色球 + 大乐透 + 七星彩 + 七乐彩）\n' +
         '    认证: Bearer Token\n\n' +
         '  POST /init/{type}\n' +
         '    说明: 初始化数据库并导入历史数据\n' +
-        '    参数: type = ssq | dlt\n' +
-        '    示例: POST /init/ssq, POST /init/dlt\n' +
+        '    参数: type = ssq | dlt | qxc | qlc\n' +
+        '    示例: POST /init/ssq, POST /init/dlt, POST /init/qxc, POST /init/qlc\n' +
         '    认证: Bearer Token\n\n' +
         '┌─────────────────────────────────────────────────────────────────┐\n' +
         '│ 查询接口（无需认证）                                            │\n' +
@@ -488,20 +516,20 @@ export default {
         '  GET /latest\n' +
         '    说明: 查询最新开奖数据\n' +
         '    默认: 返回所有类型\n' +
-        '    指定: /latest/ssq 或 /latest/dlt\n\n' +
+        '    指定: /latest/ssq 或 /latest/dlt 或 /latest/qxc 或 /latest/qlc\n\n' +
         '  GET /predict\n' +
         '    说明: 获取预测结果\n' +
         '    默认: 返回所有类型\n' +
-        '    指定: /predict/ssq 或 /predict/dlt\n' +
+        '    指定: /predict/ssq 或 /predict/dlt 或 /predict/qxc 或 /predict/qlc\n' +
         '    参数: ?count=5&strategies=frequency,balanced\n\n' +
         '  GET /stats\n' +
         '    说明: 查看号码频率统计\n' +
         '    默认: 返回所有类型\n' +
-        '    指定: /stats/ssq 或 /stats/dlt\n\n' +
+        '    指定: /stats/ssq 或 /stats/dlt 或 /stats/qxc 或 /stats/qlc\n\n' +
         '  GET /strategies\n' +
         '    说明: 查看可用预测策略\n' +
         '    默认: 返回所有类型\n' +
-        '    指定: /strategies/ssq 或 /strategies/dlt\n\n' +
+        '    指定: /strategies/ssq 或 /strategies/dlt 或 /strategies/qxc 或 /strategies/qlc\n\n' +
         '  GET /test\n' +
         '    说明: 测试 Telegram 连接\n\n' +
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
@@ -534,7 +562,7 @@ export default {
     
     // 初始化数据库（重构为调用统一方法）
     if (url.pathname.startsWith('/init') && request.method === 'POST') {
-      // 提取彩票类型：/init/ssq 或 /init/dlt，默认 ssq
+      // 提取彩票类型：/init/ssq、/init/dlt 或 /init/qxc，默认 ssq
       const type = extractLotteryType(url.pathname) || 'ssq';
       try {
         const db = new Database(env.DB);
@@ -618,7 +646,7 @@ export default {
         
         // 检查是否指定了类型
         const parts = url.pathname.split('/').filter(p => p);
-        const hasType = parts.length >= 2 && (parts[1] === 'ssq' || parts[1] === 'dlt');
+        const hasType = parts.length >= 2 && (['ssq', 'dlt', 'qxc', 'qlc'].includes(parts[1]));
         
         if (hasType) {
           // 返回指定类型的最新数据
@@ -642,7 +670,7 @@ export default {
           });
         } else {
           // 返回所有类型的最新数据
-          const types = ['ssq', 'dlt'];
+          const types = ['ssq', 'dlt', 'qxc', 'qlc'];
           const allLatest = [];
           
           for (const type of types) {
@@ -703,7 +731,7 @@ export default {
         
         // 检查是否指定了类型
         const parts = url.pathname.split('/').filter(p => p);
-        const hasType = parts.length >= 2 && (parts[1] === 'ssq' || parts[1] === 'dlt');
+        const hasType = parts.length >= 2 && (['ssq', 'dlt', 'qxc', 'qlc'].includes(parts[1]));
         
         if (hasType) {
           // 返回指定类型的预测
@@ -727,7 +755,7 @@ export default {
           });
         } else {
           // 返回所有类型的预测
-          const types = ['ssq', 'dlt'];
+          const types = ['ssq', 'dlt', 'qxc', 'qlc'];
           const allPredictions = [];
           
           for (const type of types) {
@@ -773,7 +801,7 @@ export default {
       try {
         // 检查是否指定了类型
         const parts = url.pathname.split('/').filter(p => p);
-        const hasType = parts.length >= 2 && (parts[1] === 'ssq' || parts[1] === 'dlt');
+        const hasType = parts.length >= 2 && (['ssq', 'dlt', 'qxc', 'qlc'].includes(parts[1]));
         
         if (hasType) {
           // 返回指定类型的策略
@@ -790,7 +818,7 @@ export default {
           });
         } else {
           // 返回所有类型的策略（策略是通用的，但分别列出）
-          const types = ['ssq', 'dlt'];
+          const types = ['ssq', 'dlt', 'qxc', 'qlc'];
           const allStrategies = [];
           
           for (const type of types) {
@@ -831,7 +859,7 @@ export default {
         
         // 检查是否指定了类型
         const parts = url.pathname.split('/').filter(p => p);
-        const hasType = parts.length >= 2 && (parts[1] === 'ssq' || parts[1] === 'dlt');
+        const hasType = parts.length >= 2 && (['ssq', 'dlt', 'qxc', 'qlc'].includes(parts[1]));
         
         if (hasType) {
           // 返回指定类型的统计
@@ -855,7 +883,7 @@ export default {
           });
         } else {
           // 返回所有类型的统计
-          const types = ['ssq', 'dlt'];
+          const types = ['ssq', 'dlt', 'qxc', 'qlc'];
           const allStats = [];
           
           for (const type of types) {

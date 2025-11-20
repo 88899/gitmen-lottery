@@ -34,14 +34,18 @@ def main():
   # 处理指定彩票类型（带参数）
   python lottery.py fetch ssq --mode full     # 仅爬取双色球全量数据
   python lottery.py fetch dlt --mode latest   # 仅爬取大乐透最新数据
+  python lottery.py fetch qxc --mode full     # 仅爬取七星彩全量数据
+  python lottery.py fetch qlc --mode full     # 仅爬取七乐彩全量数据
   python lottery.py predict ssq               # 仅预测双色球
   python lottery.py predict dlt               # 仅预测大乐透
+  python lottery.py predict qxc               # 仅预测七星彩
+  python lottery.py predict qlc               # 仅预测七乐彩
 
 支持的彩票类型:
   ssq  - 双色球
   dlt  - 大乐透
-  ks3  - 快开3
-  sdlt - 超级大乐透
+  qxc  - 七星彩
+  qlc  - 七乐彩
         """
     )
     
@@ -83,7 +87,7 @@ def main():
     # 执行命令
     if args.command == 'fetch':
         # 如果没有指定彩票类型，处理所有类型
-        lotteries = [args.lottery] if args.lottery else ['ssq', 'dlt']
+        lotteries = [args.lottery] if args.lottery else ['ssq', 'dlt', 'qxc', 'qlc']
         for lottery in lotteries:
             if args.mode == 'full':
                 fetch.fetch_full_history(lottery)
@@ -92,7 +96,7 @@ def main():
     
     elif args.command == 'predict':
         # 如果没有指定彩票类型，处理所有类型
-        lotteries = [args.lottery] if args.lottery else ['ssq', 'dlt']
+        lotteries = [args.lottery] if args.lottery else ['ssq', 'dlt', 'qxc', 'qlc']
         for lottery in lotteries:
             predict.predict(lottery)
     

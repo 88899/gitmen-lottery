@@ -71,6 +71,13 @@ def fetch_incremental_data(lottery_type: str, with_predict: bool = False):
                 front_str = ','.join([f"{int(b):02d}" for b in latest['front_balls']])
                 back_str = ','.join([f"{int(b):02d}" for b in latest['back_balls']])
                 logger.info(f"号码: 前区 {front_str} | 后区 {back_str}")
+            elif lottery_type == 'qxc':
+                numbers_str = ' '.join([str(n) for n in latest['numbers']])
+                logger.info(f"号码: {numbers_str}")
+            elif lottery_type == 'qlc':
+                basic_str = ' '.join([f"{int(b):02d}" for b in latest['basic_balls']])
+                logger.info(f"基本号: {basic_str}")
+                logger.info(f"特别号: {int(latest['special_ball']):02d}")
         
         # 显示预测结果
         if result.get('predictions'):
@@ -83,6 +90,12 @@ def fetch_incremental_data(lottery_type: str, with_predict: bool = False):
                     front_str = ','.join([f"{int(b):02d}" for b in pred['front_balls']])
                     back_str = ','.join([f"{int(b):02d}" for b in pred['back_balls']])
                     logger.info(f"  组合 {i}: 前区 {front_str} | 后区 {back_str}")
+                elif lottery_type == 'qxc':
+                    numbers_str = ' '.join([str(n) for n in pred['numbers']])
+                    logger.info(f"  组合 {i}: {numbers_str}")
+                elif lottery_type == 'qlc':
+                    basic_str = ' '.join([f"{int(b):02d}" for b in pred['basic_balls']])
+                    logger.info(f"  组合 {i}: {basic_str} + {int(pred['special_ball']):02d}")
     
     return result
 

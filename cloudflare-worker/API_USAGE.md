@@ -44,7 +44,7 @@ curl https://your-worker.workers.dev/predict/dlt
 **说明**：初始化数据库并智能导入历史数据（使用统一的增量爬取逻辑）
 
 **参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`）
+- `{type}`：彩票类型（`ssq`、`dlt`、`qxc` 或 `qlc`）
 
 **认证**：需要 API Key
 
@@ -157,7 +157,7 @@ curl -X POST https://your-worker.workers.dev/run \
 6. 发送 Telegram 通知
 
 **说明**：
-- 同时处理双色球和大乐透
+- 同时处理双色球、大乐透和七星彩
 - 使用统一的增量爬取逻辑（与 Python 版本一致）
 - 只在有新数据时发送 Telegram 通知
 
@@ -168,7 +168,7 @@ curl -X POST https://your-worker.workers.dev/run \
 **说明**：查询最新一期开奖数据
 
 **参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`），可选，不指定则返回所有类型
+- `{type}`：彩票类型（`ssq`、`dlt`、`qxc` 或 `qlc`），可选，不指定则返回所有类型
 
 **认证**：无需认证
 
@@ -235,7 +235,7 @@ curl https://your-worker.workers.dev/latest/dlt    # 仅大乐透
 **说明**：获取预测号码
 
 **参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`），可选，不指定则返回所有类型
+- `{type}`：彩票类型（`ssq`、`dlt`、`qxc` 或 `qlc`），可选，不指定则返回所有类型
 - `count`：预测条数（可选，默认使用 KV 配置的值）
 - `strategies`：策略列表（可选，默认使用 KV 配置的值）
 
@@ -340,7 +340,7 @@ curl "https://your-worker.workers.dev/predict/ssq?count=10&strategies=frequency,
 **说明**：查看可用的预测策略
 
 **参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`），可选，不指定则返回所有类型
+- `{type}`：彩票类型（`ssq`、`dlt`、`qxc` 或 `qlc`），可选，不指定则返回所有类型
 
 **认证**：无需认证
 
@@ -425,7 +425,7 @@ curl https://your-worker.workers.dev/strategies/dlt    # 仅大乐透
 **说明**：查看号码频率统计
 
 **参数**：
-- `{type}`：彩票类型（`ssq` 或 `dlt`），可选，不指定则返回所有类型
+- `{type}`：彩票类型（`ssq`、`dlt`、`qxc` 或 `qlc`），可选，不指定则返回所有类型
 
 **认证**：无需认证
 

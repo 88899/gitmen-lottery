@@ -67,3 +67,6 @@ tests/__pycache__/
 
 # 进程文件
 /tmp/lottery_init_count_*.txt
+
+# 会话历史（包含敏感信息，不提交到 GitHub）
+SESSION_HISTORY.md

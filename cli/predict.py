@@ -234,6 +234,189 @@ def predict(lottery_type: str):
                     else:
                         logger.error("✗ Telegram 预测发送失败")
             
+        elif lottery_type == 'qxc':
+            from lotteries.qxc.database import QXCDatabase
+            from lotteries.qxc.predictor import QXCPredictor, QXCStatistics
+            
+            db = QXCDatabase(load_db_config())
+            db.connect()
+            
+            # 获取历史数据
+            lottery_data = db.get_all_lottery_data()
+            
+            if not lottery_data:
+                logger.error("数据库中没有历史数据，请先运行爬取命令")
+                db.close()
+                return
+            
+            logger.info(f"使用 {len(lottery_data)} 条历史数据进行预测")
+            
+            # 从环境变量读取配置
+            default_strategies = os.getenv('DEFAULT_STRATEGIES', 'frequency').split(',')
+            default_strategies = [s.strip() for s in default_strategies]
+            default_count = int(os.getenv('DEFAULT_PREDICTION_COUNT', '5'))
+            
+            logger.info(f"使用策略: {', '.join(default_strategies)}")
+            logger.info(f"预测条数: {default_count}")
+            
+            # 创建预测器
+            predictor = QXCPredictor(lottery_data, strategies=default_strategies)
+            
+            # 预测
+            predictions = predictor.predict(count=default_count)
+            
+            # 显示预测结果
+            logger.info("\n" + "=" * 60)
+            logger.info("预测结果:")
+            logger.info("=" * 60)
+            
+            for i, pred in enumerate(predictions, 1):
+                numbers_str = ' '.join([str(n) for n in pred['numbers']])
+                strategy_name = pred.get('strategy_name', '')
+                
+                if strategy_name:
+                    logger.info(f"组合 {i} [{strategy_name}]: {numbers_str}")
+                else:
+                    logger.info(f"组合 {i}: {numbers_str}")
+            
+            # 显示统计信息
+            logger.info("\n" + "=" * 60)
+            logger.info("历史数据统计")
+            logger.info("=" * 60)
+            
+            stats = QXCStatistics(lottery_data)
+            
+            # 号码频率
+            freq_data = stats.get_frequency()
+            for pos in range(1, 8):
+                pos_freq = freq_data.get(f'position_{pos}', {})
+                if pos_freq:
+                    top_nums = sorted(pos_freq.items(), key=lambda x: x[1], reverse=True)[:3]
+                    logger.info(f"第{pos}位频率前3: {[f'{k}({v})' for k, v in top_nums]}")
+            
+            # 最新一期
+            latest = db.get_latest_lottery()
+            if latest:
+                logger.info(f"\n最新一期: {latest['lottery_no']} ({latest['draw_date']})")
+                numbers_str = ' '.join([str(n) for n in latest['numbers']])
+                logger.info(f"号码: {numbers_str}")
+            
+            db.close()
+            
+            # 发送 Telegram 通知
+            logger.info("\n" + "=" * 60)
+            logger.info("发送 Telegram 通知")
+            logger.info("=" * 60)
+            
+            bot = TelegramBot()
+            
+            if not bot.bot_token or not bot.chat_id:
+                logger.warning("Telegram 未配置，跳过通知")
+            else:
+                if not bot.test_connection():
+                    logger.error("Telegram 连接失败")
+                else:
+                    success = bot.send_prediction('qxc', predictions)
+                    if success:
+                        logger.info("✓ Telegram 预测发送成功")
+                    else:
+                        logger.error("✗ Telegram 预测发送失败")
+            
+        elif lottery_type == 'qlc':
+            from lotteries.qlc.database import QLCDatabase
+            from lotteries.qlc.predictor import QLCPredictor, QLCStatistics
+            
+            db = QLCDatabase(load_db_config())
+            db.connect()
+            
+            # 获取历史数据
+            lottery_data = db.get_all_lottery_data()
+            
+            if not lottery_data:
+                logger.error("数据库中没有历史数据，请先运行爬取命令")
+                db.close()
+                return
+            
+            logger.info(f"使用 {len(lottery_data)} 条历史数据进行预测")
+            
+            # 从环境变量读取配置
+            default_strategies = os.getenv('DEFAULT_STRATEGIES', 'frequency').split(',')
+            default_strategies = [s.strip() for s in default_strategies]
+            default_count = int(os.getenv('DEFAULT_PREDICTION_COUNT', '5'))
+            
+            logger.info(f"使用策略: {', '.join(default_strategies)}")
+            logger.info(f"预测条数: {default_count}")
+            
+            # 创建预测器
+            predictor = QLCPredictor(lottery_data, strategies=default_strategies)
+            
+            # 预测
+            predictions = predictor.predict(count=default_count)
+            
+            # 显示预测结果
+            logger.info("\n" + "=" * 60)
+            logger.info("预测结果:")
+            logger.info("=" * 60)
+            
+            for i, pred in enumerate(predictions, 1):
+                basic_str = ' '.join([f"{int(b):02d}" for b in pred['basic_balls']])
+                special_str = f"{int(pred['special_ball']):02d}"
+                strategy_name = pred.get('strategy_name', '')
+                
+                if strategy_name:
+                    logger.info(f"组合 {i} [{strategy_name}]: {basic_str} + {special_str}")
+                else:
+                    logger.info(f"组合 {i}: {basic_str} + {special_str}")
+            
+            # 显示统计信息
+            logger.info("\n" + "=" * 60)
+            logger.info("历史数据统计")
+            logger.info("=" * 60)
+            
+            stats = QLCStatistics(lottery_data)
+            
+            # 号码频率
+            freq_data = stats.get_frequency()
+            basic_freq = freq_data.get('basic_balls', {})
+            special_freq = freq_data.get('special_ball', {})
+            
+            if basic_freq:
+                top_basic = sorted(basic_freq.items(), key=lambda x: x[1], reverse=True)[:5]
+                logger.info(f"基本号频率前5: {[f'{k}({v})' for k, v in top_basic]}")
+            
+            if special_freq:
+                top_special = sorted(special_freq.items(), key=lambda x: x[1], reverse=True)[:3]
+                logger.info(f"特别号频率前3: {[f'{k}({v})' for k, v in top_special]}")
+            
+            # 最新一期
+            latest = db.get_latest_lottery()
+            if latest:
+                logger.info(f"\n最新一期: {latest['lottery_no']} ({latest['draw_date']})")
+                basic_str = ' '.join([f"{int(b):02d}" for b in latest['basic_balls']])
+                logger.info(f"基本号: {basic_str}")
+                logger.info(f"特别号: {int(latest['special_ball']):02d}")
+            
+            db.close()
+            
+            # 发送 Telegram 通知
+            logger.info("\n" + "=" * 60)
+            logger.info("发送 Telegram 通知")
+            logger.info("=" * 60)
+            
+            bot = TelegramBot()
+            
+            if not bot.bot_token or not bot.chat_id:
+                logger.warning("Telegram 未配置，跳过通知")
+            else:
+                if not bot.test_connection():
+                    logger.error("Telegram 连接失败")
+                else:
+                    success = bot.send_prediction('qlc', predictions)
+                    if success:
+                        logger.info("✓ Telegram 预测发送成功")
+                    else:
+                        logger.error("✗ Telegram 预测发送失败")
+            
         else:
             logger.error(f"暂不支持彩票类型: {lottery_type}")
             

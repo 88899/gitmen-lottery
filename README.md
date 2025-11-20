@@ -1,12 +1,12 @@
 # 🎰 彩票预测系统
 
-基于历史数据分析的彩票预测系统，支持双色球和大乐透。
+基于历史数据分析的彩票预测系统，支持双色球、大乐透和七星彩。
 
 提供 **Python** 和 **Cloudflare Workers** 两个版本。
 
 ## ✨ 特性
 
-- 🎯 **双彩票支持**：双色球（SSQ）+ 大乐透（DLT）
+- 🎯 **四彩票支持**：双色球（SSQ）+ 大乐透（DLT）+ 七星彩（QXC）+ 七乐彩（QLC）
 - 🔄 **数据源**：500.com，稳定可靠
 - 🤖 **智能爬取**：统一的增量爬取逻辑
 - 📊 **多策略预测**：频率、随机、均衡、冷热号
@@ -26,16 +26,19 @@ cp .env.example .env
 vim .env
 
 # 3. 全量爬取（首次使用，自动完成所有年份）
-python lottery.py fetch ssq --mode full  # 自动爬取所有年份直到完成
-python lottery.py fetch dlt --mode full  # 自动爬取所有年份直到完成
+python lottery.py fetch ssq --mode full  # 双色球：自动爬取所有年份直到完成
+python lottery.py fetch dlt --mode full  # 大乐透：自动爬取所有年份直到完成
+python lottery.py fetch qxc --mode full  # 七星彩：自动爬取所有年份直到完成
 
 # 4. 增量更新（日常使用）
 python lottery.py fetch ssq
 python lottery.py fetch dlt
+python lottery.py fetch qxc
 
 # 5. 预测号码
 python lottery.py predict ssq
 python lottery.py predict dlt
+python lottery.py predict qxc
 
 # 6. 定时任务（自动增量 + 预测）
 python lottery.py schedule
@@ -51,10 +54,12 @@ wrangler deploy
 # 2. 初始化数据（首次使用）
 ./scripts/init.sh ssq
 ./scripts/init.sh dlt
+./scripts/init.sh qxc
 
 # 3. 使用 API
 curl https://your-worker.workers.dev/latest/ssq
 curl https://your-worker.workers.dev/predict/dlt
+curl https://your-worker.workers.dev/predict/qxc
 ```
 
 ## 📖 文档
@@ -63,6 +68,7 @@ curl https://your-worker.workers.dev/predict/dlt
 - [Worker 版本](./cloudflare-worker/README.md) - Worker 使用说明
 - [API 文档](./cloudflare-worker/API_USAGE.md) - API 接口说明
 - [Telegram 设置](./docs/guides/TELEGRAM_SETUP.md) - Telegram 配置指南
+- [质量保证](./scripts/README.md) - 检查清单和验证脚本 ⭐
 
 ## 🎲 支持的彩票
 
@@ -70,6 +76,8 @@ curl https://your-worker.workers.dev/predict/dlt
 |------|------|------|---------|
 | 双色球 | ssq | 红球 1-33 选 6，蓝球 1-16 选 1 | 周二、四、日 21:15 |
 | 大乐透 | dlt | 前区 1-35 选 5，后区 1-12 选 2 | 周一、三、六 21:25 |
+| 七星彩 | qxc | 7个位置，每位 0-9 | 周二、五 20:30 |
+| 七乐彩 | qlc | 基本号 1-30 选 7，特别号 1-30 选 1 | 周一、三、五 21:15 |
 
 ## 🔧 核心功能
 
@@ -156,13 +164,21 @@ DEFAULT_PREDICTION_COUNT=5                            # 每种策略生成的组
 lottery-predictor/
 ├── lotteries/          # 彩票模块
 │   ├── ssq/           # 双色球
-│   └── dlt/           # 大乐透
+│   ├── dlt/           # 大乐透
+│   ├── qxc/           # 七星彩
+│   └── qlc/           # 七乐彩
 ├── cli/               # CLI 命令
 │   ├── fetch.py       # 爬取命令（核心方法）
 │   ├── predict.py     # 预测命令
-│   └── schedule.py    # 定时任务
+│   ├── schedule.py    # 定时任务
+│   └── smart_fetch.py # 智能爬取核心
 ├── core/              # 核心模块
 ├── cloudflare-worker/ # Worker 版本
+├── scripts/           # 质量保证脚本 ⭐
+│   ├── README.md                  # 脚本使用说明
+│   ├── INTEGRATION_CHECKLIST.md  # 完整检查清单
+│   ├── quality_check.sh           # 全面质量检查
+│   └── integration_check.sh       # 集成完整性检查
 ├── docs/              # 文档
 ├── lottery.py         # 主入口
 └── README.md          # 本文件
@@ -211,7 +227,7 @@ TELEGRAM_PROXY=http://127.0.0.1:7890  # 代理地址，根据你的代理工具�
 - **修复文件**：`cli/fetch.py`、`cli/predict.py`、`cli/schedule.py`
 
 ### 📱 Telegram 消息格式优化
-- **分开发送**：双色球和大乐透分别发送，避免消息过长
+- **分开发送**：每种彩票分别发送，避免消息过长
 - **格式清晰**：每个组合单独显示，策略名称明确标注
 - **等宽字体**：使用 `<code>` 标签确保号码对齐
 - **简洁明了**：去除冗余信息，专注于预测结果

@@ -50,6 +50,25 @@ export class Database {
         )
       `).run();
 
+      // 创建七星彩表
+      await this.db.prepare(`
+        CREATE TABLE IF NOT EXISTS qxc_lottery (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          lottery_no TEXT UNIQUE NOT NULL,
+          draw_date TEXT NOT NULL,
+          num1 TEXT NOT NULL,
+          num2 TEXT NOT NULL,
+          num3 TEXT NOT NULL,
+          num4 TEXT NOT NULL,
+          num5 TEXT NOT NULL,
+          num6 TEXT NOT NULL,
+          num7 TEXT NOT NULL,
+          sorted_code TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `).run();
+
       // 创建双色球索引
       await this.db.prepare(`
         CREATE INDEX IF NOT EXISTS idx_ssq_lottery_no ON ssq_lottery(lottery_no)
@@ -74,6 +93,52 @@ export class Database {
       
       await this.db.prepare(`
         CREATE INDEX IF NOT EXISTS idx_dlt_sorted_code ON dlt_lottery(sorted_code)
+      `).run();
+
+      // 创建七星彩索引
+      await this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_qxc_lottery_no ON qxc_lottery(lottery_no)
+      `).run();
+      
+      await this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_qxc_draw_date ON qxc_lottery(draw_date)
+      `).run();
+      
+      await this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_qxc_sorted_code ON qxc_lottery(sorted_code)
+      `).run();
+
+      // 创建七乐彩表
+      await this.db.prepare(`
+        CREATE TABLE IF NOT EXISTS qlc_lottery (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          lottery_no TEXT UNIQUE NOT NULL,
+          draw_date TEXT NOT NULL,
+          basic1 TEXT NOT NULL,
+          basic2 TEXT NOT NULL,
+          basic3 TEXT NOT NULL,
+          basic4 TEXT NOT NULL,
+          basic5 TEXT NOT NULL,
+          basic6 TEXT NOT NULL,
+          basic7 TEXT NOT NULL,
+          special TEXT NOT NULL,
+          sorted_code TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `).run();
+
+      // 创建七乐彩索引
+      await this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_qlc_lottery_no ON qlc_lottery(lottery_no)
+      `).run();
+      
+      await this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_qlc_draw_date ON qlc_lottery(draw_date)
+      `).run();
+      
+      await this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_qlc_sorted_code ON qlc_lottery(sorted_code)
       `).run();
 
       console.log('数据库初始化完成');
@@ -149,6 +214,53 @@ export class Database {
           data.front5,
           data.back1,
           data.back2,
+          data.sorted_code
+        )
+        .run();
+    } else if (table === 'qxc') {
+      const sql = `
+        INSERT INTO ${table}_lottery 
+        (lottery_no, draw_date, num1, num2, num3, num4, num5, num6, num7, sorted_code)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(lottery_no) DO UPDATE SET updated_at = datetime('now')
+      `;
+
+      await this.db
+        .prepare(sql)
+        .bind(
+          data.lottery_no,
+          data.draw_date,
+          data.num1,
+          data.num2,
+          data.num3,
+          data.num4,
+          data.num5,
+          data.num6,
+          data.num7,
+          data.sorted_code
+        )
+        .run();
+    } else if (table === 'qlc') {
+      const sql = `
+        INSERT INTO ${table}_lottery 
+        (lottery_no, draw_date, basic1, basic2, basic3, basic4, basic5, basic6, basic7, special, sorted_code)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(lottery_no) DO UPDATE SET updated_at = datetime('now')
+      `;
+
+      await this.db
+        .prepare(sql)
+        .bind(
+          data.lottery_no,
+          data.draw_date,
+          data.basic1,
+          data.basic2,
+          data.basic3,
+          data.basic4,
+          data.basic5,
+          data.basic6,
+          data.basic7,
+          data.special,
           data.sorted_code
         )
         .run();
@@ -232,6 +344,21 @@ export class Database {
         back_balls: [result.back1, result.back2],
         sorted_code: result.sorted_code
       };
+    } else if (table === 'qxc') {
+      return {
+        lottery_no: result.lottery_no,
+        draw_date: result.draw_date,
+        numbers: [result.num1, result.num2, result.num3, result.num4, result.num5, result.num6, result.num7],
+        sorted_code: result.sorted_code
+      };
+    } else if (table === 'qlc') {
+      return {
+        lottery_no: result.lottery_no,
+        draw_date: result.draw_date,
+        basic_balls: [result.basic1, result.basic2, result.basic3, result.basic4, result.basic5, result.basic6, result.basic7],
+        special_ball: result.special,
+        sorted_code: result.sorted_code
+      };
     }
   }
 
@@ -265,6 +392,21 @@ export class Database {
         back_balls: [result.back1, result.back2],
         sorted_code: result.sorted_code
       };
+    } else if (table === 'qxc') {
+      return {
+        lottery_no: result.lottery_no,
+        draw_date: result.draw_date,
+        numbers: [result.num1, result.num2, result.num3, result.num4, result.num5, result.num6, result.num7],
+        sorted_code: result.sorted_code
+      };
+    } else if (table === 'qlc') {
+      return {
+        lottery_no: result.lottery_no,
+        draw_date: result.draw_date,
+        basic_balls: [result.basic1, result.basic2, result.basic3, result.basic4, result.basic5, result.basic6, result.basic7],
+        special_ball: result.special,
+        sorted_code: result.sorted_code
+      };
     }
   }
 
@@ -295,6 +437,21 @@ export class Database {
         draw_date: row.draw_date,
         front_balls: [row.front1, row.front2, row.front3, row.front4, row.front5],
         back_balls: [row.back1, row.back2],
+        sorted_code: row.sorted_code
+      }));
+    } else if (table === 'qxc') {
+      return results.results.map(row => ({
+        lottery_no: row.lottery_no,
+        draw_date: row.draw_date,
+        numbers: [row.num1, row.num2, row.num3, row.num4, row.num5, row.num6, row.num7],
+        sorted_code: row.sorted_code
+      }));
+    } else if (table === 'qlc') {
+      return results.results.map(row => ({
+        lottery_no: row.lottery_no,
+        draw_date: row.draw_date,
+        basic_balls: [row.basic1, row.basic2, row.basic3, row.basic4, row.basic5, row.basic6, row.basic7],
+        special_ball: row.special,
         sorted_code: row.sorted_code
       }));
     }
@@ -376,6 +533,52 @@ export class Database {
         front: frontFreq,
         back: backFreq
       };
+    } else if (table === 'qxc') {
+      const results = await this.db
+        .prepare(`SELECT num1, num2, num3, num4, num5, num6, num7 FROM ${table}_lottery ORDER BY id DESC LIMIT 100`)
+        .all();
+
+      const numberFreq = {};
+
+      if (!results || !results.results || results.results.length === 0) {
+        return { numbers: {} };
+      }
+
+      for (const row of results.results) {
+        for (let i = 1; i <= 7; i++) {
+          const ball = row[`num${i}`];
+          if (ball !== null && ball !== undefined) {
+            numberFreq[ball] = (numberFreq[ball] || 0) + 1;
+          }
+        }
+      }
+
+      return { numbers: numberFreq };
+    } else if (table === 'qlc') {
+      const results = await this.db
+        .prepare(`SELECT basic1, basic2, basic3, basic4, basic5, basic6, basic7, special FROM ${table}_lottery ORDER BY id DESC LIMIT 100`)
+        .all();
+
+      const basicFreq = {};
+      const specialFreq = {};
+
+      if (!results || !results.results || results.results.length === 0) {
+        return { basic: {}, special: {} };
+      }
+
+      for (const row of results.results) {
+        for (let i = 1; i <= 7; i++) {
+          const ball = row[`basic${i}`];
+          if (ball !== null && ball !== undefined) {
+            basicFreq[ball] = (basicFreq[ball] || 0) + 1;
+          }
+        }
+        if (row.special !== null && row.special !== undefined) {
+          specialFreq[row.special] = (specialFreq[row.special] || 0) + 1;
+        }
+      }
+
+      return { basic: basicFreq, special: specialFreq };
     }
 
     // 未知类型，返回空对象
