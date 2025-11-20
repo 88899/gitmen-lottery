@@ -1,5 +1,6 @@
 /**
  * 七星彩爬虫 - Cloudflare Worker 版本
+ * 参考 Python 版本的实现逻辑
  */
 
 export class QXCSpider {
@@ -69,89 +70,87 @@ export class QXCSpider {
 
   /**
    * 解析 500.com HTML
-   * 表格结构：<table id="tablelist"> 包含 <tr class="t_tr1">
-   * 每行包含：期号、7个数字、和值、销售额、开奖日期
+   * 参考 Python 版本：使用第三个 table（tables[2]）
+   * 表格结构：
+   * - 第0列：期号
+   * - 第1列：7个数字（空格分隔）
+   * - 第4列：开奖日期
    */
   parse500Html(html, latestOnly = false) {
     const data = [];
     
     try {
-      // 调试：检查 HTML 是否包含表格标记
-      const hasTablelist = html.includes('id="tablelist"');
-      const hasTdata = html.includes('id="tdata"');
-      const hasTtr1 = html.includes('class="t_tr1"');
-      console.log(`HTML 检查: tablelist=${hasTablelist}, tdata=${hasTdata}, t_tr1=${hasTtr1}`);
+      // 查找所有 table
+      const tableMatches = [...html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)];
+      console.log(`找到 ${tableMatches.length} 个表格`);
       
-      // 查找表格
-      let tableMatch = html.match(/<table[^>]*id="tablelist"[^>]*>([\s\S]*?)<\/table>/i);
-      
-      if (!tableMatch) {
-        tableMatch = html.match(/<tbody[^>]*id="tdata"[^>]*>([\s\S]*?)<\/tbody>/i);
+      if (tableMatches.length < 3) {
+        console.log(`⚠️ 未找到数据表格，只找到 ${tableMatches.length} 个表格`);
+        return data;
       }
       
-      if (!tableMatch) {
-        console.log('⚠️ 未找到表格，尝试直接查找 tr 行');
-        // 直接查找所有 tr 行
-        const allTrMatches = [...html.matchAll(/<tr[^>]*class="t_tr1"[^>]*>([\s\S]*?)<\/tr>/gi)];
-        console.log(`直接查找到 ${allTrMatches.length} 行 t_tr1 数据`);
-        if (allTrMatches.length > 0) {
-          tableMatch = [null, html];
-        } else {
-          return data;
-        }
-      }
+      // 使用第三个表格（索引为2）
+      const dataTableContent = tableMatches[2][1];
       
-      const tableContent = tableMatch[1];
-      
-      // 提取数据行
-      const trMatches = [...tableContent.matchAll(/<tr[^>]*class="t_tr1"[^>]*>([\s\S]*?)<\/tr>/gi)];
+      // 提取所有行
+      const trMatches = [...dataTableContent.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
       console.log(`找到 ${trMatches.length} 行数据`);
       
       if (trMatches.length === 0) {
         return data;
       }
       
-      // 处理每一行
-      for (const trMatch of trMatches) {
-        const tr = trMatch[1];
+      // 跳过表头（第一行），从第二行开始
+      for (let i = 1; i < trMatches.length; i++) {
+        const tr = trMatches[i][1];
         const tdMatches = [...tr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
         
         if (tdMatches.length < 5) continue;
         
         try {
-          const texts = tdMatches.map(m => m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').replace(/,/g, '').trim());
+          // 提取单元格文本
+          const cells = tdMatches.map(m => m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').replace(/,/g, '').trim());
           
-          let lotteryNo = texts[0];
-          if (lotteryNo && /^\d{5}$/.test(lotteryNo)) {
+          // 第0列：期号
+          let lotteryNo = cells[0];
+          if (!lotteryNo || !/^\d{5,7}$/.test(lotteryNo)) {
+            continue;
+          }
+          
+          // 补全期号为7位
+          if (lotteryNo.length === 5) {
             lotteryNo = '20' + lotteryNo;
           }
           
-          const numbersStr = texts[1];
-          const numbers = numbersStr.split(/\s+/).map(n => parseInt(n)).filter(n => !isNaN(n));
-          const drawDate = texts[texts.length - 1];
+          // 第1列：中奖号码（空格分隔的7个数字）
+          const numbersText = cells[1];
+          const numbers = numbersText.split(/\s+/).map(n => parseInt(n)).filter(n => !isNaN(n));
           
-          if (lotteryNo && 
-              numbers.length === 7 && 
-              drawDate &&
-              /^\d{7}$/.test(lotteryNo) &&
-              /^\d{4}-\d{2}-\d{2}$/.test(drawDate)) {
-            
-            data.push({
-              lottery_no: lotteryNo,
-              draw_date: drawDate,
-              num1: String(numbers[0]),
-              num2: String(numbers[1]),
-              num3: String(numbers[2]),
-              num4: String(numbers[3]),
-              num5: String(numbers[4]),
-              num6: String(numbers[5]),
-              num7: String(numbers[6]),
-              sorted_code: [...numbers].sort((a,b) => a-b).map(n => String(n).padStart(2, '0')).join(',')
-            });
-            
-            if (latestOnly && data.length === 1) {
-              return data;
-            }
+          if (numbers.length !== 7) {
+            continue;
+          }
+          
+          // 第4列：开奖日期
+          const drawDate = cells[4];
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(drawDate)) {
+            continue;
+          }
+          
+          data.push({
+            lottery_no: lotteryNo,
+            draw_date: drawDate,
+            num1: String(numbers[0]),
+            num2: String(numbers[1]),
+            num3: String(numbers[2]),
+            num4: String(numbers[3]),
+            num5: String(numbers[4]),
+            num6: String(numbers[5]),
+            num7: String(numbers[6]),
+            sorted_code: [...numbers].sort((a,b) => a-b).map(n => String(n).padStart(2, '0')).join(',')
+          });
+          
+          if (latestOnly && data.length === 1) {
+            return data;
           }
         } catch (e) {
           console.error('解析行数据失败:', e);
