@@ -76,6 +76,12 @@ export class QXCSpider {
     const data = [];
     
     try {
+      // 调试：检查 HTML 是否包含表格标记
+      const hasTablelist = html.includes('id="tablelist"');
+      const hasTdata = html.includes('id="tdata"');
+      const hasTtr1 = html.includes('class="t_tr1"');
+      console.log(`HTML 检查: tablelist=${hasTablelist}, tdata=${hasTdata}, t_tr1=${hasTtr1}`);
+      
       // 查找表格
       let tableMatch = html.match(/<table[^>]*id="tablelist"[^>]*>([\s\S]*?)<\/table>/i);
       
@@ -84,8 +90,15 @@ export class QXCSpider {
       }
       
       if (!tableMatch) {
-        console.log('⚠️ 未找到表格');
-        return data;
+        console.log('⚠️ 未找到表格，尝试直接查找 tr 行');
+        // 直接查找所有 tr 行
+        const allTrMatches = [...html.matchAll(/<tr[^>]*class="t_tr1"[^>]*>([\s\S]*?)<\/tr>/gi)];
+        console.log(`直接查找到 ${allTrMatches.length} 行 t_tr1 数据`);
+        if (allTrMatches.length > 0) {
+          tableMatch = [null, html];
+        } else {
+          return data;
+        }
       }
       
       const tableContent = tableMatch[1];

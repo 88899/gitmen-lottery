@@ -80,6 +80,12 @@ export class QLCSpider {
     const data = [];
     
     try {
+      // 调试：检查 HTML 是否包含表格标记
+      const hasTablelist = html.includes('id="tablelist"');
+      const hasTdata = html.includes('id="tdata"');
+      const hasTtr1 = html.includes('class="t_tr1"');
+      console.log(`HTML 检查: tablelist=${hasTablelist}, tdata=${hasTdata}, t_tr1=${hasTtr1}`);
+      
       // 七乐彩的表格结构：<table id="tablelist"> 直接包含 <tr>，没有 <tbody>
       // 先尝试找 id="tablelist" 的表格
       let tableMatch = html.match(/<table[^>]*id="tablelist"[^>]*>([\s\S]*?)<\/table>/i);
@@ -91,7 +97,14 @@ export class QLCSpider {
       
       if (!tableMatch) {
         console.log('⚠️ 未找到表格，尝试直接匹配 <tr> 行...');
-        tableMatch = [null, html];  // 使用整个 HTML
+        // 直接查找所有 tr 行
+        const allTrMatches = [...html.matchAll(/<tr[^>]*class="t_tr1"[^>]*>([\s\S]*?)<\/tr>/gi)];
+        console.log(`直接查找到 ${allTrMatches.length} 行 t_tr1 数据`);
+        if (allTrMatches.length > 0) {
+          tableMatch = [null, html];
+        } else {
+          return data;
+        }
       }
       
       const tableContent = tableMatch[1];
