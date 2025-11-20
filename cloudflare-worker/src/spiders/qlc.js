@@ -171,72 +171,7 @@ export class QLCSpider {
     } catch (error) {
       console.error('解析 HTML 失败:', error);
     }
-      
-      const tbody = tbodyMatch[1];
-      const cleanTbody = tbody.replace(/<!--[\s\S]*?-->/g, '');
-      
-      // 提取每一行
-      const trMatches = cleanTbody.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi);
-      
-      for (const trMatch of trMatches) {
-        const tr = trMatch[1];
-        const tdMatches = [...tr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
-        
-        if (tdMatches.length < 10) continue;
-        
-        try {
-          const texts = tdMatches.map(m => m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').replace(/,/g, '').trim());
-          
-          let lotteryNo = texts[0];
-          if (lotteryNo && /^\d{5}$/.test(lotteryNo)) {
-            lotteryNo = '20' + lotteryNo;
-          }
-          
-          // 七乐彩：7个基本号 + 1个特别号 = 8个数字
-          const basicBalls = texts.slice(1, 8).filter(t => t && /^\d+$/.test(t)).map(t => parseInt(t));
-          const specialBall = texts[8] && /^\d+$/.test(texts[8]) ? parseInt(texts[8]) : null;
-          const drawDate = texts[texts.length - 1];
-          
-          if (lotteryNo && 
-              basicBalls.length === 7 && 
-              specialBall !== null && 
-              drawDate &&
-              /^\d{7}$/.test(lotteryNo) &&
-              /^\d{4}-\d{2}-\d{2}$/.test(drawDate)) {
-            
-            data.push({
-              lottery_no: lotteryNo,
-              draw_date: drawDate,
-              basic1: String(basicBalls[0]),
-              basic2: String(basicBalls[1]),
-              basic3: String(basicBalls[2]),
-              basic4: String(basicBalls[3]),
-              basic5: String(basicBalls[4]),
-              basic6: String(basicBalls[5]),
-              basic7: String(basicBalls[6]),
-              special: String(specialBall),
-              sorted_code: [...basicBalls].sort((a,b) => a-b).map(n => String(n).padStart(2, '0')).join(',') + '-' + String(specialBall).padStart(2, '0')
-            });
-            
-            if (latestOnly && data.length === 1) {
-              console.log(`成功解析最新数据: ${lotteryNo}`);
-              return data;
-            }
-          }
-        } catch (e) {
-          console.error('解析行数据失败:', e);
-        }
-      }
-      
-      if (!latestOnly) {
-        console.log(`成功解析 ${data.length} 条七乐彩数据`);
-      }
-    } catch (error) {
-      console.error('解析 HTML 失败:', error);
-    }
     
     return data;
   }
 }
-
-
