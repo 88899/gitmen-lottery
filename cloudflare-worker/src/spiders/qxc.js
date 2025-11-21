@@ -64,16 +64,16 @@ export class QXCSpider {
     const data = [];
     
     try {
-      // 第一步：找到第三个 <table>
-      const tableMatches = [...html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)];
+      // 第一步：找到 id="tablelist" 的表格（数据表格）
+      const tableMatch = html.match(/<table[^>]*id="tablelist"[^>]*>([\s\S]*?)<\/table>/i);
       
-      if (tableMatches.length < 3) {
-        console.log(`⚠️ 未找到数据表格，只找到 ${tableMatches.length} 个表格`);
+      if (!tableMatch) {
+        console.log(`⚠️ 未找到 id="tablelist" 的数据表格`);
         return data;
       }
       
-      // 获取第三个表格的内容
-      const dataTableContent = tableMatches[2][1];
+      // 获取表格内容
+      const dataTableContent = tableMatch[1];
       
       // 第二步：在表格内查找所有 <tr>
       const trMatches = [...dataTableContent.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
@@ -84,8 +84,11 @@ export class QXCSpider {
         const trContent = trMatches[i][1];
         
         try {
+          // 先移除 HTML 注释（如 <!--<td>2</td>-->）
+          const cleanTrContent = trContent.replace(/<!--[\s\S]*?-->/g, '');
+          
           // 在行内查找所有 <td>
-          const tdMatches = [...trContent.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
+          const tdMatches = [...cleanTrContent.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
           
           if (tdMatches.length < 5) continue;
           

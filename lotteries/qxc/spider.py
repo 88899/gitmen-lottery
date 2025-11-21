@@ -117,7 +117,7 @@ class QXCSpider:
         """解析 500.com 的 HTML 数据
         
         七星彩的 HTML 结构：
-        - 第三个 table 是数据表
+        - 数据表格的 id="tablelist"
         - 第0列：期号
         - 第1列：中奖号码（空格分隔的7个数字）
         - 第4列：开奖日期
@@ -127,15 +127,12 @@ class QXCSpider:
         try:
             soup = BeautifulSoup(html, 'html.parser')
             
-            # 查找所有 table，数据在第三个表格
-            tables = soup.find_all('table')
+            # 查找 id="tablelist" 的数据表格
+            data_table = soup.find('table', {'id': 'tablelist'})
             
-            if len(tables) < 3:
-                logger.warning(f"未找到数据表格，只找到 {len(tables)} 个表格")
+            if not data_table:
+                logger.warning("未找到 id='tablelist' 的数据表格")
                 return results
-            
-            # 第三个表格是数据表
-            data_table = tables[2]
             rows = data_table.find_all('tr')
             logger.info(f"找到 {len(rows)} 行数据")
             
