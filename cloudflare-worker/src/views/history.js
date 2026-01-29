@@ -1005,6 +1005,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     loadData();
     
     // 显示预测
+    // 显示预测
     async function showPrediction() {
       try {
         const config = lotteryConfig[currentType];
@@ -1015,7 +1016,7 @@ export const historyPageHTML = `<!DOCTYPE html>
         loadingMsg.textContent = '正在生成预测...';
         document.body.appendChild(loadingMsg);
         
-        const response = await fetch(\`/predict/\${currentType}?count=5\`);
+        const response = await fetch('/predict/' + currentType + '?count=5');
         const data = await response.json();
         
         document.body.removeChild(loadingMsg);
@@ -1027,6 +1028,9 @@ export const historyPageHTML = `<!DOCTYPE html>
         // 打开新窗口显示预测结果
         openPredictionWindow(data.predictions, config);
       } catch (err) {
+        // 移除加载提示（如果还存在）
+        const loadingMsg = document.querySelector('div[style*="position:fixed"]');
+        if (loadingMsg) document.body.removeChild(loadingMsg);
         alert('预测失败: ' + err.message);
       }
     }
@@ -1047,158 +1051,82 @@ export const historyPageHTML = `<!DOCTYPE html>
       // 生成预测结果的 HTML
       const predictionsHTML = renderPredictionsHTMLForWindow(predictions);
       
-      // 生成 HTML 内容
-      const html = \`
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\${config.name} - 预测结果</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+      // 构建 HTML 内容
+      const htmlParts = [];
+      htmlParts.push('<!DOCTYPE html>');
+      htmlParts.push('<html lang="zh-CN">');
+      htmlParts.push('<head>');
+      htmlParts.push('<meta charset="UTF-8">');
+      htmlParts.push('<meta name="viewport" content="width=device-width, initial-scale=1.0">');
+      htmlParts.push('<title>' + config.name + ' - 预测结果</title>');
+      htmlParts.push('<style>');
+      htmlParts.push('* { margin: 0; padding: 0; box-sizing: border-box; }');
+      htmlParts.push('body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }');
+      htmlParts.push('.container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); overflow: hidden; }');
+      htmlParts.push('.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 30px; text-align: center; }');
+      htmlParts.push('.header h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }');
+      htmlParts.push('.header p { opacity: 0.9; font-size: 14px; }');
+      htmlParts.push('.toolbar { padding: 20px 30px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }');
+      htmlParts.push('.btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s; }');
+      htmlParts.push('.btn-copy { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }');
+      htmlParts.push('.btn-copy:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4); }');
+      htmlParts.push('.btn-copy.copied { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }');
+      htmlParts.push('.content { padding: 30px; }');
+      htmlParts.push('.prediction-item { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #667eea; }');
+      htmlParts.push('.prediction-rank { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 14px; border-radius: 12px; font-size: 14px; font-weight: bold; margin-right: 10px; }');
+      htmlParts.push('.prediction-strategy { display: inline-block; background: white; color: #666; padding: 6px 12px; border-radius: 8px; font-size: 12px; margin-left: 10px; }');
+      htmlParts.push('.prediction-balls { margin-top: 15px; }');
+      htmlParts.push('.balls-container { display: flex; gap: 8px; flex-wrap: wrap; }');
+      htmlParts.push('.ball { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }');
+      htmlParts.push('.ball-red { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }');
+      htmlParts.push('.ball-blue { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }');
+      htmlParts.push('.ball-front { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }');
+      htmlParts.push('.ball-back { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }');
+      htmlParts.push('.ball-basic { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }');
+      htmlParts.push('.ball-special { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }');
+      htmlParts.push('.ball-number { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }');
+      htmlParts.push('.footer { padding: 20px 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; }');
+      htmlParts.push('</style>');
+      htmlParts.push('</head>');
+      htmlParts.push('<body>');
+      htmlParts.push('<div class="container">');
+      htmlParts.push('<div class="header">');
+      htmlParts.push('<h1>🎲 ' + config.name + ' - 预测结果</h1>');
+      htmlParts.push('<p>生成时间：' + new Date().toLocaleString('zh-CN') + '</p>');
+      htmlParts.push('</div>');
+      htmlParts.push('<div class="toolbar">');
+      htmlParts.push('<div>共 ' + predictions.length + ' 注预测</div>');
+      htmlParts.push('<button class="btn btn-copy" onclick="copyToClipboard()">📋 复制到剪贴板</button>');
+      htmlParts.push('</div>');
+      htmlParts.push('<div class="content">');
+      htmlParts.push(predictionsHTML);
+      htmlParts.push('</div>');
+      htmlParts.push('<div class="footer">');
+      htmlParts.push('<p>⚠️ 预测结果仅供参考，不构成任何投注建议</p>');
+      htmlParts.push('</div>');
+      htmlParts.push('</div>');
+      htmlParts.push('<script>');
+      htmlParts.push('var textContent = ' + JSON.stringify(textContent) + ';');
+      htmlParts.push('function copyToClipboard() {');
+      htmlParts.push('  var btn = document.querySelector(".btn-copy");');
+      htmlParts.push('  navigator.clipboard.writeText(textContent).then(function() {');
+      htmlParts.push('    btn.textContent = "✓ 已复制";');
+      htmlParts.push('    btn.classList.add("copied");');
+      htmlParts.push('    setTimeout(function() {');
+      htmlParts.push('      btn.textContent = "📋 复制到剪贴板";');
+      htmlParts.push('      btn.classList.remove("copied");');
+      htmlParts.push('    }, 2000);');
+      htmlParts.push('  }).catch(function(err) {');
+      htmlParts.push('    alert("复制失败: " + err.message);');
+      htmlParts.push('  });');
+      htmlParts.push('}');
+      htmlParts.push('</script>');
+      htmlParts.push('</body>');
+      htmlParts.push('</html>');
+      
+      newWindow.document.write(htmlParts.join('\n'));
+      newWindow.document.close();
     }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-      overflow: hidden;
-    }
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 20px 30px;
-      text-align: center;
-    }
-    .header h1 {
-      font-size: 24px;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-    .header p {
-      opacity: 0.9;
-      font-size: 14px;
-    }
-    .toolbar {
-      padding: 20px 30px;
-      border-bottom: 1px solid #e0e0e0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .btn {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.3s;
-    }
-    .btn-copy {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      color: white;
-    }
-    .btn-copy:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
-    }
-    .btn-copy.copied {
-      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-    }
-    .content {
-      padding: 30px;
-    }
-    .prediction-item {
-      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-left: 4px solid #667eea;
-    }
-    .prediction-rank {
-      display: inline-block;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 6px 14px;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: bold;
-      margin-right: 10px;
-    }
-    .prediction-strategy {
-      display: inline-block;
-      background: white;
-      color: #666;
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      margin-left: 10px;
-    }
-    .prediction-balls {
-      margin-top: 15px;
-    }
-    .balls-container {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .ball {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 14px;
-      color: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .ball-red { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
-    .ball-blue { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-    .ball-front { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
-    .ball-back { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-    .ball-basic { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
-    .ball-special { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-    .ball-number { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
-    .footer {
-      padding: 20px 30px;
-      text-align: center;
-      color: #999;
-      font-size: 12px;
-      border-top: 1px solid #e0e0e0;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>🎲 \${config.name} - 预测结果</h1>
-      <p>生成时间：\${new Date().toLocaleString('zh-CN')}</p>
-    </div>
-    <div class="toolbar">
-      <div>共 \${predictions.length} 注预测</div>
-      <button class="btn btn-copy" onclick="copyToClipboard()">📋 复制到剪贴板</button>
-    </div>
-    <div class="content">
-      \${predictionsHTML}
-    </div>
-    <div class="footer">
-      <p>⚠️ 预测结果仅供参考，不构成任何投注建议</p>
-    </div>
-  </div>
   
   <script>
     const textContent = \\\`\${textContent.replace(/`/g, '\\\\`').replace(/\$/g, '\\$')}\\\`;
