@@ -1097,7 +1097,8 @@ export const historyPageHTML = `<!DOCTYPE html>
       htmlParts.push('</div>');
       htmlParts.push('</div>');
       htmlParts.push('<script>');
-      htmlParts.push('var textContent = ' + JSON.stringify(textContent) + ';');
+      htmlParts.push('var textContent = ' + JSON.stringify(JSON.stringify(textContent)) + ';');
+      htmlParts.push('textContent = JSON.parse(textContent);');
       htmlParts.push('function copyToClipboard() {');
       htmlParts.push('  var btn = document.querySelector(".btn-copy");');
       htmlParts.push('  navigator.clipboard.writeText(textContent).then(function() {');
