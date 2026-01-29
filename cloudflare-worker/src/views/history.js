@@ -711,7 +711,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       for (let i = config.redRange[0]; i <= config.redRange[1]; i++) {
         // 七星彩不补零，其他彩票补零
         const num = currentType === 'qxc' ? String(i) : String(i).padStart(2, '0');
-        redHtml += \`<div class="selectable-ball red" data-type="red" data-value="\${num}">\${num}</div>\`;
+        redHtml += '<div class="selectable-ball red" data-type="red" data-value="' + num + '">' + num + '</div>';
       }
       redContainer.innerHTML = redHtml;
       
@@ -725,7 +725,7 @@ export const historyPageHTML = `<!DOCTYPE html>
         let blueHtml = '';
         for (let i = config.blueRange[0]; i <= config.blueRange[1]; i++) {
           const num = String(i).padStart(2, '0');
-          blueHtml += \`<div class="selectable-ball blue" data-type="blue" data-value="\${num}">\${num}</div>\`;
+          blueHtml += '<div class="selectable-ball blue" data-type="blue" data-value="' + num + '">' + num + '</div>';
         }
         blueContainer.innerHTML = blueHtml;
       } else {
@@ -837,7 +837,7 @@ export const historyPageHTML = `<!DOCTYPE html>
           ...currentFilters
         });
         
-        const response = await fetch(\`/api/history/\${currentType}?\${params}\`);
+        const response = await fetch('/api/history/' + currentType + '?' + params);
         const data = await response.json();
         
         if (!data.success) {
@@ -859,14 +859,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       const results = document.getElementById('results');
       
       if (!data || data.length === 0) {
-        results.innerHTML = \`
-          <div class="empty-state">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-            </svg>
-            <p>暂无数据</p>
-          </div>
-        \`;
+        results.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><p>暂无数据</p></div>';
         return;
       }
       
@@ -887,20 +880,20 @@ export const historyPageHTML = `<!DOCTYPE html>
       
       data.forEach(item => {
         tableHTML += '<tr>';
-        tableHTML += \`<td><strong>\${item.lottery_no}</strong></td>\`;
-        tableHTML += \`<td>\${item.draw_date}</td>\`;
+        tableHTML += '<td><strong>' + item.lottery_no + '</strong></td>';
+        tableHTML += '<td>' + item.draw_date + '</td>';
         
         if (currentType === 'ssq') {
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.red_balls, 'red')}</div></td>\`;
-          tableHTML += \`<td><div class="balls-container">\${renderBall(item.blue_ball, 'blue')}</div></td>\`;
+          tableHTML += '<td><div class="balls-container">' + renderBalls(item.red_balls, 'red') + '</div></td>';
+          tableHTML += '<td><div class="balls-container">' + renderBall(item.blue_ball, 'blue') + '</div></td>';
         } else if (currentType === 'dlt') {
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.front_balls, 'front')}</div></td>\`;
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.back_balls, 'back')}</div></td>\`;
+          tableHTML += '<td><div class="balls-container">' + renderBalls(item.front_balls, 'front') + '</div></td>';
+          tableHTML += '<td><div class="balls-container">' + renderBalls(item.back_balls, 'back') + '</div></td>';
         } else if (currentType === 'qxc') {
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.numbers, 'number')}</div></td>\`;
+          tableHTML += '<td><div class="balls-container">' + renderBalls(item.numbers, 'number') + '</div></td>';
         } else if (currentType === 'qlc') {
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.basic_balls, 'basic')}</div></td>\`;
-          tableHTML += \`<td><div class="balls-container">\${renderBall(item.special_ball, 'special')}</div></td>\`;
+          tableHTML += '<td><div class="balls-container">' + renderBalls(item.basic_balls, 'basic') + '</div></td>';
+          tableHTML += '<td><div class="balls-container">' + renderBall(item.special_ball, 'special') + '</div></td>';
         }
         
         tableHTML += '</tr>';
@@ -918,7 +911,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     function renderBall(ball, type) {
-      return \`<div class="ball ball-\${type}">\${ball}</div>\`;
+      return '<div class="ball ball-' + type + '">' + ball + '</div>';
     }
     
     // 渲染分页
@@ -931,13 +924,11 @@ export const historyPageHTML = `<!DOCTYPE html>
       }
       
       pagination.style.display = 'flex';
-      pagination.innerHTML = \`
-        <button onclick="goToPage(1)" \${page === 1 ? 'disabled' : ''}">首页</button>
-        <button onclick="goToPage(\${page - 1})" \${page === 1 ? 'disabled' : ''}">上一页</button>
-        <span class="page-info">第 \${page} / \${totalPages} 页 (共 \${total} 条)</span>
-        <button onclick="goToPage(\${page + 1})" \${page === totalPages ? 'disabled' : ''}">下一页</button>
-        <button onclick="goToPage(\${totalPages})" \${page === totalPages ? 'disabled' : ''}">末页</button>
-      \`;
+      pagination.innerHTML = '<button onclick="goToPage(1)" ' + (page === 1 ? 'disabled' : '') + '>首页</button>' +
+        '<button onclick="goToPage(' + (page - 1) + ')" ' + (page === 1 ? 'disabled' : '') + '>上一页</button>' +
+        '<span class="page-info">第 ' + page + ' / ' + totalPages + ' 页 (共 ' + total + ' 条)</span>' +
+        '<button onclick="goToPage(' + (page + 1) + ')" ' + (page === totalPages ? 'disabled' : '') + '>下一页</button>' +
+        '<button onclick="goToPage(' + totalPages + ')" ' + (page === totalPages ? 'disabled' : '') + '>末页</button>';
     }
     
     // 跳转页面
@@ -1130,31 +1121,31 @@ export const historyPageHTML = `<!DOCTYPE html>
     
     // 生成预测结果的文本格式
     function generatePredictionText(predictions, config) {
-      let text = \`\${config.name} - 预测结果\\n\`;
-      text += \`生成时间：\${new Date().toLocaleString('zh-CN')}\\n\`;
-      text += \`${'='.repeat(50)}\\n\\n\`;
+      let text = config.name + ' - 预测结果\n';
+      text += '生成时间：' + new Date().toLocaleString('zh-CN') + '\n';
+      text += '==================================================\n\n';
       
       predictions.forEach(pred => {
-        text += \`第 \${pred.rank} 注 [\${pred.strategy_name || pred.strategy}]\\n\`;
+        text += '第 ' + pred.rank + ' 注 [' + (pred.strategy_name || pred.strategy) + ']\n';
         
         if (currentType === 'ssq') {
-          text += \`红球：\${pred.red_balls.join(', ')}\\n\`;
-          text += \`蓝球：\${pred.blue_ball}\\n\`;
+          text += '红球：' + pred.red_balls.join(', ') + '\n';
+          text += '蓝球：' + pred.blue_ball + '\n';
         } else if (currentType === 'dlt') {
-          text += \`前区：\${pred.front_balls.join(', ')}\\n\`;
-          text += \`后区：\${pred.back_balls.join(', ')}\\n\`;
+          text += '前区：' + pred.front_balls.join(', ') + '\n';
+          text += '后区：' + pred.back_balls.join(', ') + '\n';
         } else if (currentType === 'qxc') {
-          text += \`号码：\${pred.numbers.join(', ')}\\n\`;
+          text += '号码：' + pred.numbers.join(', ') + '\n';
         } else if (currentType === 'qlc') {
-          text += \`基本号：\${pred.basic_balls.join(', ')}\\n\`;
-          text += \`特别号：\${pred.special_ball}\\n\`;
+          text += '基本号：' + pred.basic_balls.join(', ') + '\n';
+          text += '特别号：' + pred.special_ball + '\n';
         }
         
-        text += \`\\n\`;
+        text += '\n';
       });
       
-      text += \`${'='.repeat(50)}\\n\`;
-      text += \`⚠️ 预测结果仅供参考，不构成任何投注建议\`;
+      text += '==================================================\n';
+      text += '⚠️ 预测结果仅供参考，不构成任何投注建议';
       
       return text;
     }
@@ -1206,10 +1197,10 @@ export const historyPageHTML = `<!DOCTYPE html>
       
       predictions.forEach(pred => {
         html += '<div class="prediction-item">';
-        html += \`<div>\`;
-        html += \`<span class="prediction-rank">第 \${pred.rank} 注</span>\`;
-        html += \`<span class="prediction-strategy">\${pred.strategy_name || pred.strategy}</span>\`;
-        html += \`</div>\`;
+        html += '<div>';
+        html += '<span class="prediction-rank">第 ' + pred.rank + ' 注</span>';
+        html += '<span class="prediction-strategy">' + (pred.strategy_name || pred.strategy) + '</span>';
+        html += '</div>';
         html += '<div class="prediction-balls">';
         
         if (currentType === 'ssq') {
@@ -1246,7 +1237,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       const title = document.getElementById('predictionTitle');
       const results = document.getElementById('predictionResults');
       
-      title.textContent = \`\${config.name} - 预测结果\`;
+      title.textContent = config.name + ' - 预测结果';
       results.innerHTML = renderModalPredictions(predictions);
       
       // 保存预测数据供复制使用
@@ -1261,10 +1252,10 @@ export const historyPageHTML = `<!DOCTYPE html>
       
       predictions.forEach(pred => {
         html += '<div class="prediction-item">';
-        html += \`<div>\`;
-        html += \`<span class="prediction-rank">第 \${pred.rank} 注</span>\`;
-        html += \`<span class="prediction-strategy">\${pred.strategy_name || pred.strategy}</span>\`;
-        html += \`</div>\`;
+        html += '<div>';
+        html += '<span class="prediction-rank">第 ' + pred.rank + ' 注</span>';
+        html += '<span class="prediction-strategy">' + (pred.strategy_name || pred.strategy) + '</span>';
+        html += '</div>';
         html += '<div class="prediction-balls">';
         
         if (currentType === 'ssq') {
