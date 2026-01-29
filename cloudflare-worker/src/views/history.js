@@ -389,34 +389,63 @@ export const historyPageHTML = `<!DOCTYPE html>
     .prediction-content {
       background: white;
       border-radius: 12px;
-      padding: 30px;
-      max-width: 800px;
-      max-height: 80vh;
-      overflow-y: auto;
+      padding: 0;
+      max-width: 900px;
+      width: 90%;
+      max-height: 85vh;
+      overflow: hidden;
       box-shadow: 0 10px 40px rgba(0,0,0,0.3);
       position: relative;
+      display: flex;
+      flex-direction: column;
     }
     
     .prediction-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
+      padding: 20px 30px;
       border-bottom: 2px solid #e0e0e0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
     }
     
     .prediction-header h2 {
       font-size: 20px;
-      color: #333;
       margin: 0;
+    }
+    
+    .prediction-header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .btn-copy-modal {
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.3s;
+    }
+    
+    .btn-copy-modal:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .btn-copy-modal.copied {
+      background: rgba(56, 239, 125, 0.3);
+      border-color: rgba(56, 239, 125, 0.5);
     }
     
     .close-btn {
       background: none;
       border: none;
       font-size: 28px;
-      color: #999;
+      color: white;
       cursor: pointer;
       padding: 0;
       width: 32px;
@@ -429,8 +458,13 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .close-btn:hover {
-      background: #f0f0f0;
-      color: #333;
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .prediction-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 30px;
     }
     
     .prediction-item {
@@ -478,6 +512,15 @@ export const historyPageHTML = `<!DOCTYPE html>
       padding: 15px;
       border-radius: 6px;
       margin-bottom: 20px;
+    }
+    
+    .prediction-footer {
+      padding: 15px 30px;
+      text-align: center;
+      color: #999;
+      font-size: 12px;
+      border-top: 1px solid #e0e0e0;
+      background: #f8f9fa;
     }
     
     @media (max-width: 1024px) {
@@ -593,16 +636,24 @@ export const historyPageHTML = `<!DOCTYPE html>
     </div>
   </div>
   
-  <!-- 预测弹窗 -->
+  <!-- 预测弹窗（备用方案） -->
   <div id="predictionModal" class="prediction-modal">
     <div class="prediction-content">
       <div class="prediction-header">
         <h2 id="predictionTitle">预测结果</h2>
-        <button class="close-btn" onclick="closePrediction()">&times;</button>
+        <div class="prediction-header-actions">
+          <button class="btn-copy-modal" onclick="copyModalToClipboard()">📋 复制</button>
+          <button class="close-btn" onclick="closePrediction()">&times;</button>
+        </div>
       </div>
-      <div id="predictionLoading" class="prediction-loading" style="display: none;">正在生成预测...</div>
-      <div id="predictionError" class="prediction-error" style="display: none;"></div>
-      <div id="predictionResults"></div>
+      <div class="prediction-body">
+        <div id="predictionLoading" class="prediction-loading" style="display: none;">正在生成预测...</div>
+        <div id="predictionError" class="prediction-error" style="display: none;"></div>
+        <div id="predictionResults"></div>
+      </div>
+      <div class="prediction-footer">
+        <p>⚠️ 预测结果仅供参考，不构成任何投注建议</p>
+      </div>
     </div>
   </div>
   
@@ -955,54 +1006,257 @@ export const historyPageHTML = `<!DOCTYPE html>
     
     // 显示预测
     async function showPrediction() {
-      const modal = document.getElementById('predictionModal');
-      const loading = document.getElementById('predictionLoading');
-      const error = document.getElementById('predictionError');
-      const results = document.getElementById('predictionResults');
-      const title = document.getElementById('predictionTitle');
-      
-      // 显示弹窗
-      modal.classList.add('show');
-      loading.style.display = 'block';
-      error.style.display = 'none';
-      results.innerHTML = '';
-      
-      // 更新标题
-      const config = lotteryConfig[currentType];
-      title.textContent = \`\${config.name} - 预测结果\`;
-      
       try {
+        const config = lotteryConfig[currentType];
+        
+        // 显示加载提示
+        const loadingMsg = document.createElement('div');
+        loadingMsg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;';
+        loadingMsg.textContent = '正在生成预测...';
+        document.body.appendChild(loadingMsg);
+        
         const response = await fetch(\`/predict/\${currentType}?count=5\`);
         const data = await response.json();
+        
+        document.body.removeChild(loadingMsg);
         
         if (!data || !data.predictions || data.predictions.length === 0) {
           throw new Error('预测结果为空');
         }
         
-        renderPredictions(data.predictions);
+        // 打开新窗口显示预测结果
+        openPredictionWindow(data.predictions, config);
       } catch (err) {
-        error.textContent = '预测失败: ' + err.message;
-        error.style.display = 'block';
-      } finally {
-        loading.style.display = 'none';
+        alert('预测失败: ' + err.message);
       }
     }
     
-    // 关闭预测弹窗
-    function closePrediction() {
-      document.getElementById('predictionModal').classList.remove('show');
+    // 在新窗口中显示预测结果
+    function openPredictionWindow(predictions, config) {
+      const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+      
+      if (!newWindow) {
+        // 如果无法打开新窗口（被浏览器拦截），使用弹窗
+        showPredictionModal(predictions, config);
+        return;
+      }
+      
+      // 生成预测结果的文本格式（用于复制）
+      const textContent = generatePredictionText(predictions, config);
+      
+      // 生成 HTML 内容
+      const html = \`
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>\${config.name} - 预测结果</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px 30px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .header p {
+      opacity: 0.9;
+      font-size: 14px;
+    }
+    .toolbar {
+      padding: 20px 30px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s;
+    }
+    .btn-copy {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+    .btn-copy:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+    }
+    .btn-copy.copied {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    .content {
+      padding: 30px;
+    }
+    .prediction-item {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-left: 4px solid #667eea;
+    }
+    .prediction-rank {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 6px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    .prediction-strategy {
+      display: inline-block;
+      background: white;
+      color: #666;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin-left: 10px;
+    }
+    .prediction-balls {
+      margin-top: 15px;
+    }
+    .balls-container {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .ball {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .ball-red { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
+    .ball-blue { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .ball-front { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
+    .ball-back { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .ball-basic { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
+    .ball-special { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .ball-number { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
+    .footer {
+      padding: 20px 30px;
+      text-align: center;
+      color: #999;
+      font-size: 12px;
+      border-top: 1px solid #e0e0e0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎲 \${config.name} - 预测结果</h1>
+      <p>生成时间：\${new Date().toLocaleString('zh-CN')}</p>
+    </div>
+    <div class="toolbar">
+      <div>共 \${predictions.length} 注预测</div>
+      <button class="btn btn-copy" onclick="copyToClipboard()">📋 复制到剪贴板</button>
+    </div>
+    <div class="content">
+      \${renderPredictionsHTML(predictions)}
+    </div>
+    <div class="footer">
+      <p>⚠️ 预测结果仅供参考，不构成任何投注建议</p>
+    </div>
+  </div>
+  
+  <script>
+    const textContent = \\\`\${textContent.replace(/`/g, '\\\\`')}\\\`;
+    
+    function copyToClipboard() {
+      const btn = document.querySelector('.btn-copy');
+      
+      navigator.clipboard.writeText(textContent).then(() => {
+        btn.textContent = '✓ 已复制';
+        btn.classList.add('copied');
+        
+        setTimeout(() => {
+          btn.textContent = '📋 复制到剪贴板';
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(err => {
+        alert('复制失败: ' + err.message);
+      });
+    }
+  </script>
+</body>
+</html>
+      \`;
+      
+      newWindow.document.write(html);
+      newWindow.document.close();
     }
     
-    // 点击弹窗外部关闭
-    document.getElementById('predictionModal').addEventListener('click', function(e) {
-      if (e.target === this) {
-        closePrediction();
-      }
-    });
+    // 生成预测结果的文本格式
+    function generatePredictionText(predictions, config) {
+      let text = \`\${config.name} - 预测结果\\n\`;
+      text += \`生成时间：\${new Date().toLocaleString('zh-CN')}\\n\`;
+      text += \`${'='.repeat(50)}\\n\\n\`;
+      
+      predictions.forEach(pred => {
+        text += \`第 \${pred.rank} 注 [\${pred.strategy_name || pred.strategy}]\\n\`;
+        
+        if (currentType === 'ssq') {
+          text += \`红球：\${pred.red_balls.join(', ')}\\n\`;
+          text += \`蓝球：\${pred.blue_ball}\\n\`;
+        } else if (currentType === 'dlt') {
+          text += \`前区：\${pred.front_balls.join(', ')}\\n\`;
+          text += \`后区：\${pred.back_balls.join(', ')}\\n\`;
+        } else if (currentType === 'qxc') {
+          text += \`号码：\${pred.numbers.join(', ')}\\n\`;
+        } else if (currentType === 'qlc') {
+          text += \`基本号：\${pred.basic_balls.join(', ')}\\n\`;
+          text += \`特别号：\${pred.special_ball}\\n\`;
+        }
+        
+        text += \`\\n\`;
+      });
+      
+      text += \`${'='.repeat(50)}\\n\`;
+      text += \`⚠️ 预测结果仅供参考，不构成任何投注建议\`;
+      
+      return text;
+    }
     
-    // 渲染预测结果
-    function renderPredictions(predictions) {
-      const results = document.getElementById('predictionResults');
+    // 渲染预测结果 HTML
+    function renderPredictionsHTML(predictions) {
       let html = '';
       
       predictions.forEach(pred => {
@@ -1038,7 +1292,98 @@ export const historyPageHTML = `<!DOCTYPE html>
         html += '</div>';
       });
       
-      results.innerHTML = html;
+      return html;
+    }
+    
+    // 使用弹窗显示（备用方案）
+    function showPredictionModal(predictions, config) {
+      const modal = document.getElementById('predictionModal');
+      const title = document.getElementById('predictionTitle');
+      const results = document.getElementById('predictionResults');
+      
+      title.textContent = \`\${config.name} - 预测结果\`;
+      results.innerHTML = renderModalPredictions(predictions);
+      
+      // 保存预测数据供复制使用
+      window.currentPredictions = predictions;
+      
+      modal.classList.add('show');
+    }
+    
+    // 渲染弹窗中的预测结果
+    function renderModalPredictions(predictions) {
+      let html = '';
+      
+      predictions.forEach(pred => {
+        html += '<div class="prediction-item">';
+        html += \`<div>\`;
+        html += \`<span class="prediction-rank">第 \${pred.rank} 注</span>\`;
+        html += \`<span class="prediction-strategy">\${pred.strategy_name || pred.strategy}</span>\`;
+        html += \`</div>\`;
+        html += '<div class="prediction-balls">';
+        
+        if (currentType === 'ssq') {
+          html += '<div class="balls-container">';
+          html += renderBalls(pred.red_balls, 'red');
+          html += renderBall(pred.blue_ball, 'blue');
+          html += '</div>';
+        } else if (currentType === 'dlt') {
+          html += '<div class="balls-container">';
+          html += renderBalls(pred.front_balls, 'front');
+          html += renderBalls(pred.back_balls, 'back');
+          html += '</div>';
+        } else if (currentType === 'qxc') {
+          html += '<div class="balls-container">';
+          html += renderBalls(pred.numbers, 'number');
+          html += '</div>';
+        } else if (currentType === 'qlc') {
+          html += '<div class="balls-container">';
+          html += renderBalls(pred.basic_balls, 'basic');
+          html += renderBall(pred.special_ball, 'special');
+          html += '</div>';
+        }
+        
+        html += '</div>';
+        html += '</div>';
+      });
+      
+      return html;
+    }
+    
+    // 关闭预测弹窗
+    function closePrediction() {
+      document.getElementById('predictionModal').classList.remove('show');
+    }
+    
+    // 点击弹窗外部关闭
+    document.getElementById('predictionModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closePrediction();
+      }
+    });
+    
+    // 复制弹窗中的预测结果到剪贴板
+    function copyModalToClipboard() {
+      if (!window.currentPredictions) {
+        alert('没有可复制的预测结果');
+        return;
+      }
+      
+      const config = lotteryConfig[currentType];
+      const textContent = generatePredictionText(window.currentPredictions, config);
+      const btn = document.querySelector('.btn-copy-modal');
+      
+      navigator.clipboard.writeText(textContent).then(() => {
+        btn.textContent = '✓ 已复制';
+        btn.classList.add('copied');
+        
+        setTimeout(() => {
+          btn.textContent = '📋 复制';
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(err => {
+        alert('复制失败: ' + err.message);
+      });
     }
   </script>
 </body>
