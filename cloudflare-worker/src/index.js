@@ -13,6 +13,7 @@ import { QLCPredictor } from './predictors/qlc.js';
 import { TelegramBot } from './utils/telegram.js';
 import { Database } from './utils/database.js';
 import { DataExporter } from './utils/exporter.js';
+import { HistoryAPI } from './utils/history-api.js';
 import { handleNetworkError, handleParseError, handleCriticalError } from './utils/error-handler.js';
 
 /**
@@ -1228,6 +1229,85 @@ export default {
           success: false,
           error: error.message
         }, null, 2), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' }
+        });
+      }
+    }
+    
+    // 历史记录查询页面
+    if (url.pathname === '/history') {
+      try {
+        // 导入HTML模块
+        const { historyPageHTML } = await import('./views/history.js');
+        return new Response(historyPageHTML, {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        });
+      } catch (error) {
+        console.error('加载历史记录页面失败:', error);
+        return new Response('页面加载失败', {
+          status: 500,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      }
+    }
+    
+    // 历史记录查询API
+    if (url.pathname.startsWith('/api/history/')) {
+      try {
+        const db = new Database(env.DB);
+        const historyAPI = new HistoryAPI(db);
+        
+        // 提取彩票类型
+        const parts = url.pathname.split('/').filter(p => p);
+        if (parts.length < 3) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: '缺少彩票类型参数'
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json; charset=utf-8' }
+          });
+        }
+        
+        const type = parts[2];
+        if (!['ssq', 'dlt', 'qxc', 'qlc'].includes(type)) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: '不支持的彩票类型'
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json; charset=utf-8' }
+          });
+        }
+        
+        // 获取查询参数
+        const page = parseInt(url.searchParams.get('page') || '1');
+        const limit = parseInt(url.searchParams.get('limit') || '10');
+        const filters = {};
+        
+        if (url.searchParams.get('lottery_no')) {
+          filters.lottery_no = url.searchParams.get('lottery_no');
+        }
+        if (url.searchParams.get('draw_date')) {
+          filters.draw_date = url.searchParams.get('draw_date');
+        }
+        if (url.searchParams.get('numbers')) {
+          filters.numbers = url.searchParams.get('numbers');
+        }
+        
+        // 查询数据
+        const result = await historyAPI.query(type, filters, page, limit);
+        
+        return new Response(JSON.stringify(result), {
+          headers: { 'Content-Type': 'application/json; charset=utf-8' }
+        });
+      } catch (error) {
+        console.error('历史记录查询失败:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: error.message
+        }), {
           status: 500,
           headers: { 'Content-Type': 'application/json; charset=utf-8' }
         });

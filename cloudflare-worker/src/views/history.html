@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>彩票历史记录查询</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+    
+    .header p {
+      opacity: 0.9;
+      font-size: 14px;
+    }
+    
+    .content {
+      padding: 30px;
+    }
+    
+    .lottery-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+    
+    .lottery-tab {
+      padding: 12px 24px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .lottery-tab:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+    
+    .lottery-tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: transparent;
+    }
+    
+    .search-box {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    
+    .search-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .search-field {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .search-field label {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    
+    .search-field input {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+    
+    .search-field input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .search-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    
+    .btn {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-secondary {
+      background: white;
+      color: #666;
+      border: 1px solid #ddd;
+    }
+    
+    .btn-secondary:hover {
+      background: #f8f9fa;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+    
+    .error {
+      background: #fee;
+      color: #c33;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    
+    .history-table th {
+      background: #f8f9fa;
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      border-bottom: 2px solid #e0e0e0;
+      font-size: 13px;
+    }
+    
+    .history-table td {
+      padding: 15px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+    }
+    
+    .history-table tr:hover {
+      background: #f8f9fa;
+    }
+    
+    .balls-container {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .ball {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 13px;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .ball-red {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    }
+    
+    .ball-blue {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .ball-front {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    }
+    
+    .ball-back {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .ball-basic {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    }
+    
+    .ball-special {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .ball-number {
+      background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+      color: #333;
+    }
+    
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-top: 30px;
+    }
+    
+    .pagination button {
+      padding: 8px 16px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .pagination button:hover:not(:disabled) {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+    
+    .pagination button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .pagination .page-info {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+    
+    .empty-state svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      opacity: 0.3;
+    }
+    
+    @media (max-width: 768px) {
+      .search-row {
+        grid-template-columns: 1fr;
+      }
+      
+      .history-table {
+        font-size: 12px;
+      }
+      
+      .history-table th,
+      .history-table td {
+        padding: 10px;
+      }
+      
+      .ball {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎲 彩票历史记录查询</h1>
+      <p>查询双色球、大乐透、七星彩、七乐彩的历史开奖记录</p>
+    </div>
+    
+    <div class="content">
+      <div class="lottery-tabs">
+        <div class="lottery-tab active" data-type="ssq">双色球</div>
+        <div class="lottery-tab" data-type="dlt">大乐透</div>
+        <div class="lottery-tab" data-type="qxc">七星彩</div>
+        <div class="lottery-tab" data-type="qlc">七乐彩</div>
+      </div>
+      
+      <div class="search-box">
+        <div class="search-row">
+          <div class="search-field">
+            <label>期号</label>
+            <input type="text" id="issueNo" placeholder="例如：2025001">
+          </div>
+          <div class="search-field">
+            <label>开奖日期</label>
+            <input type="date" id="drawDate">
+          </div>
+          <div class="search-field">
+            <label>号码查询</label>
+            <input type="text" id="numbers" placeholder="例如：01,02,08-06">
+          </div>
+        </div>
+        <div class="search-actions">
+          <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
+          <button class="btn btn-primary" onclick="search()">查询</button>
+        </div>
+      </div>
+      
+      <div id="errorMessage" class="error" style="display: none;"></div>
+      <div id="loading" class="loading" style="display: none;">加载中...</div>
+      <div id="results"></div>
+      <div id="pagination" class="pagination" style="display: none;"></div>
+    </div>
+  </div>
+  
+  <script>
+    let currentType = 'ssq';
+    let currentPage = 1;
+    let currentFilters = {};
+    
+    // 切换彩票类型
+    document.querySelectorAll('.lottery-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.lottery-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentType = tab.dataset.type;
+        currentPage = 1;
+        loadData();
+      });
+    });
+    
+    // 加载数据
+    async function loadData() {
+      const loading = document.getElementById('loading');
+      const results = document.getElementById('results');
+      const pagination = document.getElementById('pagination');
+      const errorMessage = document.getElementById('errorMessage');
+      
+      loading.style.display = 'block';
+      results.innerHTML = '';
+      pagination.style.display = 'none';
+      errorMessage.style.display = 'none';
+      
+      try {
+        const params = new URLSearchParams({
+          page: currentPage,
+          limit: 10,
+          ...currentFilters
+        });
+        
+        const response = await fetch(`/api/history/${currentType}?${params}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || '加载失败');
+        }
+        
+        renderTable(data.data, data.total);
+        renderPagination(data.page, data.totalPages, data.total);
+      } catch (error) {
+        errorMessage.textContent = error.message;
+        errorMessage.style.display = 'block';
+      } finally {
+        loading.style.display = 'none';
+      }
+    }
+    
+    // 渲染表格
+    function renderTable(data, total) {
+      const results = document.getElementById('results');
+      
+      if (!data || data.length === 0) {
+        results.innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            <p>暂无数据</p>
+          </div>
+        `;
+        return;
+      }
+      
+      let tableHTML = '<table class="history-table"><thead><tr>';
+      tableHTML += '<th>期号</th><th>开奖日期</th>';
+      
+      if (currentType === 'ssq') {
+        tableHTML += '<th>红球</th><th>蓝球</th>';
+      } else if (currentType === 'dlt') {
+        tableHTML += '<th>前区</th><th>后区</th>';
+      } else if (currentType === 'qxc') {
+        tableHTML += '<th>号码</th>';
+      } else if (currentType === 'qlc') {
+        tableHTML += '<th>基本号</th><th>特别号</th>';
+      }
+      
+      tableHTML += '</tr></thead><tbody>';
+      
+      data.forEach(item => {
+        tableHTML += '<tr>';
+        tableHTML += `<td><strong>${item.lottery_no}</strong></td>`;
+        tableHTML += `<td>${item.draw_date}</td>`;
+        
+        if (currentType === 'ssq') {
+          tableHTML += `<td><div class="balls-container">${renderBalls(item.red_balls, 'red')}</div></td>`;
+          tableHTML += `<td><div class="balls-container">${renderBall(item.blue_ball, 'blue')}</div></td>`;
+        } else if (currentType === 'dlt') {
+          tableHTML += `<td><div class="balls-container">${renderBalls(item.front_balls, 'front')}</div></td>`;
+          tableHTML += `<td><div class="balls-container">${renderBalls(item.back_balls, 'back')}</div></td>`;
+        } else if (currentType === 'qxc') {
+          tableHTML += `<td><div class="balls-container">${renderBalls(item.numbers, 'number')}</div></td>`;
+        } else if (currentType === 'qlc') {
+          tableHTML += `<td><div class="balls-container">${renderBalls(item.basic_balls, 'basic')}</div></td>`;
+          tableHTML += `<td><div class="balls-container">${renderBall(item.special_ball, 'special')}</div></td>`;
+        }
+        
+        tableHTML += '</tr>';
+      });
+      
+      tableHTML += '</tbody></table>';
+      results.innerHTML = tableHTML;
+    }
+    
+    // 渲染球号
+    function renderBalls(balls, type) {
+      if (!balls) return '';
+      const ballsArray = Array.isArray(balls) ? balls : balls.split(',');
+      return ballsArray.map(ball => renderBall(ball, type)).join('');
+    }
+    
+    function renderBall(ball, type) {
+      return `<div class="ball ball-${type}">${ball}</div>`;
+    }
+    
+    // 渲染分页
+    function renderPagination(page, totalPages, total) {
+      const pagination = document.getElementById('pagination');
+      
+      if (totalPages <= 1) {
+        pagination.style.display = 'none';
+        return;
+      }
+      
+      pagination.style.display = 'flex';
+      pagination.innerHTML = `
+        <button onclick="goToPage(1)" ${page === 1 ? 'disabled' : ''}>首页</button>
+        <button onclick="goToPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>上一页</button>
+        <span class="page-info">第 ${page} / ${totalPages} 页 (共 ${total} 条)</span>
+        <button onclick="goToPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>下一页</button>
+        <button onclick="goToPage(${totalPages})" ${page === totalPages ? 'disabled' : ''}>末页</button>
+      `;
+    }
+    
+    // 跳转页面
+    function goToPage(page) {
+      currentPage = page;
+      loadData();
+    }
+    
+    // 搜索
+    function search() {
+      const issueNo = document.getElementById('issueNo').value.trim();
+      const drawDate = document.getElementById('drawDate').value;
+      const numbers = document.getElementById('numbers').value.trim();
+      
+      currentFilters = {};
+      if (issueNo) currentFilters.lottery_no = issueNo;
+      if (drawDate) currentFilters.draw_date = drawDate;
+      if (numbers) currentFilters.numbers = numbers;
+      
+      currentPage = 1;
+      loadData();
+    }
+    
+    // 重置搜索
+    function resetSearch() {
+      document.getElementById('issueNo').value = '';
+      document.getElementById('drawDate').value = '';
+      document.getElementById('numbers').value = '';
+      currentFilters = {};
+      currentPage = 1;
+      loadData();
+    }
+    
+    // 回车搜索
+    document.querySelectorAll('.search-field input').forEach(input => {
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') search();
+      });
+    });
+    
+    // 初始加载
+    loadData();
+  </script>
+</body>
+</html>
