@@ -149,6 +149,16 @@ export const historyPageHTML = `<!DOCTYPE html>
       background: #f0f0f0;
     }
     
+    .btn-predict {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+    
+    .btn-predict:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+    }
+    
     .main-content {
       display: flex;
       min-height: 600px;
@@ -359,6 +369,117 @@ export const historyPageHTML = `<!DOCTYPE html>
       opacity: 0.3;
     }
     
+    .prediction-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .prediction-modal.show {
+      display: flex;
+    }
+    
+    .prediction-content {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 800px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    
+    .prediction-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    
+    .prediction-header h2 {
+      font-size: 20px;
+      color: #333;
+      margin: 0;
+    }
+    
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 28px;
+      color: #999;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.3s;
+    }
+    
+    .close-btn:hover {
+      background: #f0f0f0;
+      color: #333;
+    }
+    
+    .prediction-item {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .prediction-rank {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    
+    .prediction-strategy {
+      display: inline-block;
+      background: white;
+      color: #666;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      margin-left: 10px;
+    }
+    
+    .prediction-balls {
+      margin-top: 12px;
+    }
+    
+    .prediction-loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+    
+    .prediction-error {
+      background: #fee;
+      color: #c33;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    
     @media (max-width: 1024px) {
       .toolbar {
         flex-direction: column;
@@ -446,6 +567,7 @@ export const historyPageHTML = `<!DOCTYPE html>
         <input type="text" id="numbers" class="search-input" placeholder="">
         <button class="btn btn-primary" onclick="search()">查询</button>
         <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
+        <button class="btn btn-predict" onclick="showPrediction()">预测</button>
       </div>
     </div>
     
@@ -468,6 +590,19 @@ export const historyPageHTML = `<!DOCTYPE html>
         <div id="results"></div>
         <div id="pagination" class="pagination" style="display: none;"></div>
       </div>
+    </div>
+  </div>
+  
+  <!-- 预测弹窗 -->
+  <div id="predictionModal" class="prediction-modal">
+    <div class="prediction-content">
+      <div class="prediction-header">
+        <h2 id="predictionTitle">预测结果</h2>
+        <button class="close-btn" onclick="closePrediction()">&times;</button>
+      </div>
+      <div id="predictionLoading" class="prediction-loading" style="display: none;">正在生成预测...</div>
+      <div id="predictionError" class="prediction-error" style="display: none;"></div>
+      <div id="predictionResults"></div>
     </div>
   </div>
   
@@ -817,6 +952,94 @@ export const historyPageHTML = `<!DOCTYPE html>
     updatePlaceholder();
     initBallSelector();
     loadData();
+    
+    // 显示预测
+    async function showPrediction() {
+      const modal = document.getElementById('predictionModal');
+      const loading = document.getElementById('predictionLoading');
+      const error = document.getElementById('predictionError');
+      const results = document.getElementById('predictionResults');
+      const title = document.getElementById('predictionTitle');
+      
+      // 显示弹窗
+      modal.classList.add('show');
+      loading.style.display = 'block';
+      error.style.display = 'none';
+      results.innerHTML = '';
+      
+      // 更新标题
+      const config = lotteryConfig[currentType];
+      title.textContent = \`\${config.name} - 预测结果\`;
+      
+      try {
+        const response = await fetch(\`/predict/\${currentType}?count=5\`);
+        const data = await response.json();
+        
+        if (!data || !data.predictions || data.predictions.length === 0) {
+          throw new Error('预测结果为空');
+        }
+        
+        renderPredictions(data.predictions);
+      } catch (err) {
+        error.textContent = '预测失败: ' + err.message;
+        error.style.display = 'block';
+      } finally {
+        loading.style.display = 'none';
+      }
+    }
+    
+    // 关闭预测弹窗
+    function closePrediction() {
+      document.getElementById('predictionModal').classList.remove('show');
+    }
+    
+    // 点击弹窗外部关闭
+    document.getElementById('predictionModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closePrediction();
+      }
+    });
+    
+    // 渲染预测结果
+    function renderPredictions(predictions) {
+      const results = document.getElementById('predictionResults');
+      let html = '';
+      
+      predictions.forEach(pred => {
+        html += '<div class="prediction-item">';
+        html += \`<div>\`;
+        html += \`<span class="prediction-rank">第 \${pred.rank} 注</span>\`;
+        html += \`<span class="prediction-strategy">\${pred.strategy_name || pred.strategy}</span>\`;
+        html += \`</div>\`;
+        html += '<div class="prediction-balls">';
+        
+        if (currentType === 'ssq') {
+          html += '<div class="balls-container">';
+          html += renderBalls(pred.red_balls, 'red');
+          html += renderBall(pred.blue_ball, 'blue');
+          html += '</div>';
+        } else if (currentType === 'dlt') {
+          html += '<div class="balls-container">';
+          html += renderBalls(pred.front_balls, 'front');
+          html += renderBalls(pred.back_balls, 'back');
+          html += '</div>';
+        } else if (currentType === 'qxc') {
+          html += '<div class="balls-container">';
+          html += renderBalls(pred.numbers, 'number');
+          html += '</div>';
+        } else if (currentType === 'qlc') {
+          html += '<div class="balls-container">';
+          html += renderBalls(pred.basic_balls, 'basic');
+          html += renderBall(pred.special_ball, 'special');
+          html += '</div>';
+        }
+        
+        html += '</div>';
+        html += '</div>';
+      });
+      
+      results.innerHTML = html;
+    }
   </script>
 </body>
 </html>`;
