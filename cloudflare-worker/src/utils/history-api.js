@@ -191,10 +191,10 @@ export class HistoryAPI {
             const paddedBall = ball.padStart(2, '0');
             const redConditions = [];
             for (let i = 1; i <= 6; i++) {
-              redConditions.push(\`red\${i} = ?\`);
+              redConditions.push(`red${i} = ?`);
               params.push(paddedBall);
             }
-            conditions.push(\`(\${redConditions.join(' OR ')})\`);
+            conditions.push(`(${redConditions.join(' OR ')})`);
           });
         }
         
@@ -238,10 +238,10 @@ export class HistoryAPI {
             const paddedBall = ball.padStart(2, '0');
             const frontConditions = [];
             for (let i = 1; i <= 5; i++) {
-              frontConditions.push(\`front\${i} = ?\`);
+              frontConditions.push(`front${i} = ?`);
               params.push(paddedBall);
             }
-            conditions.push(\`(\${frontConditions.join(' OR ')})\`);
+            conditions.push(`(${frontConditions.join(' OR ')})`);
           });
         }
         
@@ -261,10 +261,10 @@ export class HistoryAPI {
             const paddedBall = ball.padStart(2, '0');
             const backConditions = [];
             for (let i = 1; i <= 2; i++) {
-              backConditions.push(\`back\${i} = ?\`);
+              backConditions.push(`back${i} = ?`);
               params.push(paddedBall);
             }
-            conditions.push(\`(\${backConditions.join(' OR ')})\`);
+            conditions.push(`(${backConditions.join(' OR ')})`);
           });
         }
         
@@ -291,10 +291,10 @@ export class HistoryAPI {
             }
             const numConditions = [];
             for (let i = 1; i <= 7; i++) {
-              numConditions.push(\`num\${i} = ?\`);
+              numConditions.push(`num${i} = ?`);
               params.push(num);
             }
-            conditions.push(\`(\${numConditions.join(' OR ')})\`);
+            conditions.push(`(${numConditions.join(' OR ')})`);
           });
           
           return {
@@ -324,10 +324,10 @@ export class HistoryAPI {
             const paddedBall = ball.padStart(2, '0');
             const basicConditions = [];
             for (let i = 1; i <= 7; i++) {
-              basicConditions.push(\`basic\${i} = ?\`);
+              basicConditions.push(`basic${i} = ?`);
               params.push(paddedBall);
             }
-            conditions.push(\`(\${basicConditions.join(' OR ')})\`);
+            conditions.push(`(${basicConditions.join(' OR ')})`);
           });
         }
         
