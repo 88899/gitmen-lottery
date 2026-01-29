@@ -389,34 +389,63 @@ export const historyPageHTML = `<!DOCTYPE html>
     .prediction-content {
       background: white;
       border-radius: 12px;
-      padding: 30px;
-      max-width: 800px;
-      max-height: 80vh;
-      overflow-y: auto;
+      padding: 0;
+      max-width: 95%;
+      width: 1200px;
+      max-height: 90vh;
+      overflow: hidden;
       box-shadow: 0 10px 40px rgba(0,0,0,0.3);
       position: relative;
+      display: flex;
+      flex-direction: column;
     }
     
     .prediction-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
+      padding: 20px 30px;
       border-bottom: 2px solid #e0e0e0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
     }
     
     .prediction-header h2 {
       font-size: 20px;
-      color: #333;
       margin: 0;
+    }
+    
+    .prediction-header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .btn-copy-modal {
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.3s;
+    }
+    
+    .btn-copy-modal:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .btn-copy-modal.copied {
+      background: rgba(56, 239, 125, 0.3);
+      border-color: rgba(56, 239, 125, 0.5);
     }
     
     .close-btn {
       background: none;
       border: none;
       font-size: 28px;
-      color: #999;
+      color: white;
       cursor: pointer;
       padding: 0;
       width: 32px;
@@ -429,16 +458,30 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .close-btn:hover {
-      background: #f0f0f0;
-      color: #333;
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .prediction-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 30px;
     }
     
     .prediction-item {
       background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
       border-radius: 8px;
-      padding: 15px;
+      padding: 20px;
       margin-bottom: 15px;
       border-left: 4px solid #667eea;
+    }
+    
+    .prediction-footer {
+      padding: 15px 30px;
+      text-align: center;
+      color: #999;
+      font-size: 12px;
+      border-top: 1px solid #e0e0e0;
+      background: #f8f9fa;
     }
     
     .prediction-rank {
@@ -598,11 +641,19 @@ export const historyPageHTML = `<!DOCTYPE html>
     <div class="prediction-content">
       <div class="prediction-header">
         <h2 id="predictionTitle">预测结果</h2>
-        <button class="close-btn" onclick="closePrediction()">&times;</button>
+        <div class="prediction-header-actions">
+          <button class="btn-copy-modal" onclick="copyModalToClipboard()">📋 复制</button>
+          <button class="close-btn" onclick="closePrediction()">&times;</button>
+        </div>
       </div>
-      <div id="predictionLoading" class="prediction-loading" style="display: none;">正在生成预测...</div>
-      <div id="predictionError" class="prediction-error" style="display: none;"></div>
-      <div id="predictionResults"></div>
+      <div class="prediction-body">
+        <div id="predictionLoading" class="prediction-loading" style="display: none;">正在生成预测...</div>
+        <div id="predictionError" class="prediction-error" style="display: none;"></div>
+        <div id="predictionResults"></div>
+      </div>
+      <div class="prediction-footer">
+        <p>⚠️ 预测结果仅供参考，不构成任何投注建议</p>
+      </div>
     </div>
   </div>
   
@@ -979,6 +1030,9 @@ export const historyPageHTML = `<!DOCTYPE html>
           throw new Error('预测结果为空');
         }
         
+        // 保存预测数据供复制使用
+        window.currentPredictions = data.predictions;
+        
         renderPredictions(data.predictions);
       } catch (err) {
         error.textContent = '预测失败: ' + err.message;
@@ -986,6 +1040,61 @@ export const historyPageHTML = `<!DOCTYPE html>
       } finally {
         loading.style.display = 'none';
       }
+    }
+    
+    // 生成预测结果的文本格式
+    function generatePredictionText(predictions, config) {
+      let text = config.name + ' - 预测结果\\n';
+      text += '生成时间：' + new Date().toLocaleString('zh-CN') + '\\n';
+      text += '==================================================\\n\\n';
+      
+      predictions.forEach(pred => {
+        text += '第 ' + pred.rank + ' 注 [' + (pred.strategy_name || pred.strategy) + ']\\n';
+        
+        if (currentType === 'ssq') {
+          text += '红球：' + pred.red_balls.join(', ') + '\\n';
+          text += '蓝球：' + pred.blue_ball + '\\n';
+        } else if (currentType === 'dlt') {
+          text += '前区：' + pred.front_balls.join(', ') + '\\n';
+          text += '后区：' + pred.back_balls.join(', ') + '\\n';
+        } else if (currentType === 'qxc') {
+          text += '号码：' + pred.numbers.join(', ') + '\\n';
+        } else if (currentType === 'qlc') {
+          text += '基本号：' + pred.basic_balls.join(', ') + '\\n';
+          text += '特别号：' + pred.special_ball + '\\n';
+        }
+        
+        text += '\\n';
+      });
+      
+      text += '==================================================\\n';
+      text += '⚠️ 预测结果仅供参考，不构成任何投注建议';
+      
+      return text;
+    }
+    
+    // 复制弹窗中的预测结果到剪贴板
+    function copyModalToClipboard() {
+      if (!window.currentPredictions) {
+        alert('没有可复制的预测结果');
+        return;
+      }
+      
+      const config = lotteryConfig[currentType];
+      const textContent = generatePredictionText(window.currentPredictions, config);
+      const btn = document.querySelector('.btn-copy-modal');
+      
+      navigator.clipboard.writeText(textContent).then(() => {
+        btn.textContent = '✓ 已复制';
+        btn.classList.add('copied');
+        
+        setTimeout(() => {
+          btn.textContent = '📋 复制';
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(err => {
+        alert('复制失败: ' + err.message);
+      });
     }
     
     // 关闭预测弹窗
