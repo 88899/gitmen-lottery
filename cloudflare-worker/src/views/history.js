@@ -390,9 +390,9 @@ export const historyPageHTML = `<!DOCTYPE html>
       background: white;
       border-radius: 12px;
       padding: 0;
-      max-width: 900px;
-      width: 90%;
-      max-height: 85vh;
+      max-width: 95%;
+      width: 1200px;
+      max-height: 90vh;
       overflow: hidden;
       box-shadow: 0 10px 40px rgba(0,0,0,0.3);
       position: relative;
@@ -470,7 +470,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     .prediction-item {
       background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
       border-radius: 8px;
-      padding: 15px;
+      padding: 20px;
       margin-bottom: 15px;
       border-left: 4px solid #667eea;
     }
@@ -996,128 +996,41 @@ export const historyPageHTML = `<!DOCTYPE html>
     loadData();
     
     // 显示预测
-    // 显示预测
     async function showPrediction() {
+      const modal = document.getElementById('predictionModal');
+      const title = document.getElementById('predictionTitle');
+      const loading = document.getElementById('predictionLoading');
+      const error = document.getElementById('predictionError');
+      const results = document.getElementById('predictionResults');
+      
+      // 显示弹窗和加载状态
+      modal.classList.add('show');
+      loading.style.display = 'block';
+      error.style.display = 'none';
+      results.innerHTML = '';
+      
       try {
         const config = lotteryConfig[currentType];
-        
-        // 显示加载提示
-        const loadingMsg = document.createElement('div');
-        loadingMsg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;';
-        loadingMsg.textContent = '正在生成预测...';
-        document.body.appendChild(loadingMsg);
+        title.textContent = config.name + ' - 预测结果';
         
         const response = await fetch('/predict/' + currentType + '?count=5');
         const data = await response.json();
-        
-        document.body.removeChild(loadingMsg);
         
         if (!data || !data.predictions || data.predictions.length === 0) {
           throw new Error('预测结果为空');
         }
         
-        // 打开新窗口显示预测结果
-        openPredictionWindow(data.predictions, config);
+        // 保存预测数据供复制使用
+        window.currentPredictions = data.predictions;
+        
+        // 渲染预测结果
+        results.innerHTML = renderModalPredictions(data.predictions);
+        loading.style.display = 'none';
       } catch (err) {
-        // 移除加载提示（如果还存在）
-        const loadingMsg = document.querySelector('div[style*="position:fixed"]');
-        if (loadingMsg) document.body.removeChild(loadingMsg);
-        alert('预测失败: ' + err.message);
+        loading.style.display = 'none';
+        error.textContent = '预测失败: ' + err.message;
+        error.style.display = 'block';
       }
-    }
-    
-    // 在新窗口中显示预测结果
-    function openPredictionWindow(predictions, config) {
-      const newWindow = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
-      
-      if (!newWindow) {
-        // 如果无法打开新窗口（被浏览器拦截），使用弹窗
-        showPredictionModal(predictions, config);
-        return;
-      }
-      
-      // 生成预测结果的文本格式（用于复制）
-      const textContent = generatePredictionText(predictions, config);
-      
-      // 生成预测结果的 HTML
-      const predictionsHTML = renderPredictionsHTMLForWindow(predictions);
-      
-      // 构建 HTML 内容
-      const htmlParts = [];
-      htmlParts.push('<!DOCTYPE html>');
-      htmlParts.push('<html lang="zh-CN">');
-      htmlParts.push('<head>');
-      htmlParts.push('<meta charset="UTF-8">');
-      htmlParts.push('<meta name="viewport" content="width=device-width, initial-scale=1.0">');
-      htmlParts.push('<title>' + config.name + ' - 预测结果</title>');
-      htmlParts.push('<style>');
-      htmlParts.push('* { margin: 0; padding: 0; box-sizing: border-box; }');
-      htmlParts.push('body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }');
-      htmlParts.push('.container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); overflow: hidden; }');
-      htmlParts.push('.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 30px; text-align: center; }');
-      htmlParts.push('.header h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }');
-      htmlParts.push('.header p { opacity: 0.9; font-size: 14px; }');
-      htmlParts.push('.toolbar { padding: 20px 30px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }');
-      htmlParts.push('.btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s; }');
-      htmlParts.push('.btn-copy { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }');
-      htmlParts.push('.btn-copy:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4); }');
-      htmlParts.push('.btn-copy.copied { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }');
-      htmlParts.push('.content { padding: 30px; }');
-      htmlParts.push('.prediction-item { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #667eea; }');
-      htmlParts.push('.prediction-rank { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 6px 14px; border-radius: 12px; font-size: 14px; font-weight: bold; margin-right: 10px; }');
-      htmlParts.push('.prediction-strategy { display: inline-block; background: white; color: #666; padding: 6px 12px; border-radius: 8px; font-size: 12px; margin-left: 10px; }');
-      htmlParts.push('.prediction-balls { margin-top: 15px; }');
-      htmlParts.push('.balls-container { display: flex; gap: 8px; flex-wrap: wrap; }');
-      htmlParts.push('.ball { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }');
-      htmlParts.push('.ball-red { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }');
-      htmlParts.push('.ball-blue { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }');
-      htmlParts.push('.ball-front { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }');
-      htmlParts.push('.ball-back { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }');
-      htmlParts.push('.ball-basic { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }');
-      htmlParts.push('.ball-special { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }');
-      htmlParts.push('.ball-number { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }');
-      htmlParts.push('.footer { padding: 20px 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; }');
-      htmlParts.push('</style>');
-      htmlParts.push('</head>');
-      htmlParts.push('<body>');
-      htmlParts.push('<div class="container">');
-      htmlParts.push('<div class="header">');
-      htmlParts.push('<h1>🎲 ' + config.name + ' - 预测结果</h1>');
-      htmlParts.push('<p>生成时间：' + new Date().toLocaleString('zh-CN') + '</p>');
-      htmlParts.push('</div>');
-      htmlParts.push('<div class="toolbar">');
-      htmlParts.push('<div>共 ' + predictions.length + ' 注预测</div>');
-      htmlParts.push('<button class="btn btn-copy" onclick="copyToClipboard()">📋 复制到剪贴板</button>');
-      htmlParts.push('</div>');
-      htmlParts.push('<div class="content">');
-      htmlParts.push(predictionsHTML);
-      htmlParts.push('</div>');
-      htmlParts.push('<div class="footer">');
-      htmlParts.push('<p>⚠️ 预测结果仅供参考，不构成任何投注建议</p>');
-      htmlParts.push('</div>');
-      htmlParts.push('</div>');
-      htmlParts.push('<script>');
-      htmlParts.push('var textContent = ' + JSON.stringify(JSON.stringify(textContent)) + ';');
-      htmlParts.push('textContent = JSON.parse(textContent);');
-      htmlParts.push('function copyToClipboard() {');
-      htmlParts.push('  var btn = document.querySelector(".btn-copy");');
-      htmlParts.push('  navigator.clipboard.writeText(textContent).then(function() {');
-      htmlParts.push('    btn.textContent = "✓ 已复制";');
-      htmlParts.push('    btn.classList.add("copied");');
-      htmlParts.push('    setTimeout(function() {');
-      htmlParts.push('      btn.textContent = "📋 复制到剪贴板";');
-      htmlParts.push('      btn.classList.remove("copied");');
-      htmlParts.push('    }, 2000);');
-      htmlParts.push('  }).catch(function(err) {');
-      htmlParts.push('    alert("复制失败: " + err.message);');
-      htmlParts.push('  });');
-      htmlParts.push('}');
-      htmlParts.push('<' + '/script>');
-      htmlParts.push('</body>');
-      htmlParts.push('</html>');
-      
-      newWindow.document.write(htmlParts.join('\n'));
-      newWindow.document.close();
     }
     
     // 生成预测结果的文本格式
@@ -1149,102 +1062,6 @@ export const historyPageHTML = `<!DOCTYPE html>
       text += '⚠️ 预测结果仅供参考，不构成任何投注建议';
       
       return text;
-    }
-    
-    // 渲染预测结果 HTML（用于新窗口）
-    function renderPredictionsHTMLForWindow(predictions) {
-      let html = '';
-      
-      predictions.forEach(pred => {
-        html += '<div class="prediction-item">';
-        html += '<div>';
-        html += '<span class="prediction-rank">第 ' + pred.rank + ' 注</span>';
-        html += '<span class="prediction-strategy">' + (pred.strategy_name || pred.strategy) + '</span>';
-        html += '</div>';
-        html += '<div class="prediction-balls"><div class="balls-container">';
-        
-        if (currentType === 'ssq') {
-          pred.red_balls.forEach(ball => {
-            html += '<div class="ball ball-red">' + ball + '</div>';
-          });
-          html += '<div class="ball ball-blue">' + pred.blue_ball + '</div>';
-        } else if (currentType === 'dlt') {
-          pred.front_balls.forEach(ball => {
-            html += '<div class="ball ball-front">' + ball + '</div>';
-          });
-          pred.back_balls.forEach(ball => {
-            html += '<div class="ball ball-back">' + ball + '</div>';
-          });
-        } else if (currentType === 'qxc') {
-          pred.numbers.forEach(ball => {
-            html += '<div class="ball ball-number">' + ball + '</div>';
-          });
-        } else if (currentType === 'qlc') {
-          pred.basic_balls.forEach(ball => {
-            html += '<div class="ball ball-basic">' + ball + '</div>';
-          });
-          html += '<div class="ball ball-special">' + pred.special_ball + '</div>';
-        }
-        
-        html += '</div></div></div>';
-      });
-      
-      return html;
-    }
-    
-    // 渲染预测结果 HTML（用于弹窗）
-    function renderPredictionsHTML(predictions) {
-      let html = '';
-      
-      predictions.forEach(pred => {
-        html += '<div class="prediction-item">';
-        html += '<div>';
-        html += '<span class="prediction-rank">第 ' + pred.rank + ' 注</span>';
-        html += '<span class="prediction-strategy">' + (pred.strategy_name || pred.strategy) + '</span>';
-        html += '</div>';
-        html += '<div class="prediction-balls">';
-        
-        if (currentType === 'ssq') {
-          html += '<div class="balls-container">';
-          html += renderBalls(pred.red_balls, 'red');
-          html += renderBall(pred.blue_ball, 'blue');
-          html += '</div>';
-        } else if (currentType === 'dlt') {
-          html += '<div class="balls-container">';
-          html += renderBalls(pred.front_balls, 'front');
-          html += renderBalls(pred.back_balls, 'back');
-          html += '</div>';
-        } else if (currentType === 'qxc') {
-          html += '<div class="balls-container">';
-          html += renderBalls(pred.numbers, 'number');
-          html += '</div>';
-        } else if (currentType === 'qlc') {
-          html += '<div class="balls-container">';
-          html += renderBalls(pred.basic_balls, 'basic');
-          html += renderBall(pred.special_ball, 'special');
-          html += '</div>';
-        }
-        
-        html += '</div>';
-        html += '</div>';
-      });
-      
-      return html;
-    }
-    
-    // 使用弹窗显示（备用方案）
-    function showPredictionModal(predictions, config) {
-      const modal = document.getElementById('predictionModal');
-      const title = document.getElementById('predictionTitle');
-      const results = document.getElementById('predictionResults');
-      
-      title.textContent = config.name + ' - 预测结果';
-      results.innerHTML = renderModalPredictions(predictions);
-      
-      // 保存预测数据供复制使用
-      window.currentPredictions = predictions;
-      
-      modal.classList.add('show');
     }
     
     // 渲染弹窗中的预测结果
