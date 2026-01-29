@@ -18,8 +18,11 @@ export class QLCPredictor {
   async predict(count = 5, strategies = null) {
     const useStrategies = strategies || this.strategies;
     
-    // 获取历史数据
-    const historyData = await this.db.getAll('qlc', 100);
+    // 获取历史数据和历史组合
+    const [historyData, historicalCombinations] = await Promise.all([
+      this.db.getAll('qlc', 100),
+      this.db.getHistoricalCombinations('qlc')
+    ]);
     
     if (!historyData || historyData.length === 0) {
       throw new Error('没有历史数据');
@@ -34,16 +37,10 @@ export class QLCPredictor {
     const analysis = this.analyzeHistory(historyData);
     
     const predictions = [];
-    const usedCombinations = new Set();
-    
-    // 记录历史组合
-    historyData.forEach(item => {
-      const combo = item.basic_balls.slice().sort().join(',') + '-' + item.special_ball;
-      usedCombinations.add(combo);
-    });
+    const usedCombinations = new Set(historicalCombinations);
     
     let attempts = 0;
-    const maxAttempts = count * 10;
+    const maxAttempts = count * 20; // 增加尝试次数
     
     while (predictions.length < count && attempts < maxAttempts) {
       attempts++;
@@ -51,20 +48,24 @@ export class QLCPredictor {
       const strategy = useStrategies[attempts % useStrategies.length];
       const prediction = this.generatePrediction(strategy, analysis);
       
-      const combo = prediction.basic_balls.slice().sort().join(',') + '-' + prediction.special_ball;
+      // 格式化 sorted_code（基本号排序 + 特别号）
+      const sortedBasic = [...prediction.basic_balls].sort((a, b) => a - b);
+      const sortedCode = sortedBasic.map(n => String(n).padStart(2, '0')).join(',') + 
+                        '-' + String(prediction.special_ball).padStart(2, '0');
       
-      if (!usedCombinations.has(combo)) {
+      if (!usedCombinations.has(sortedCode)) {
         predictions.push({
           ...prediction,
+          sorted_code: sortedCode,
           rank: predictions.length + 1,
           strategy: strategy,
           strategy_name: this.getStrategyName(strategy)
         });
-        usedCombinations.add(combo);
+        usedCombinations.add(sortedCode);
       }
     }
     
-    console.log(`生成 ${predictions.length} 个七乐彩预测`);
+    console.log(`生成 ${predictions.length} 个七乐彩预测（尝试 ${attempts} 次）`);
     return predictions;
   }
 
@@ -138,8 +139,8 @@ export class QLCPredictor {
     const specialBall = smartSpecialSelection(this.historyData, specialFreq, availableForSpecial);
     
     return {
-      basic_balls: basicBalls.sort((a, b) => a - b),
-      special_ball: specialBall
+      basic_balls: basicBalls.map(n => String(n).padStart(2, '0')),
+      special_ball: String(specialBall).padStart(2, '0')
     };
   }
 
@@ -152,8 +153,8 @@ export class QLCPredictor {
     const specialBall = availableForSpecial[Math.floor(Math.random() * availableForSpecial.length)];
     
     return {
-      basic_balls: basicBalls.sort((a, b) => a - b),
-      special_ball: specialBall
+      basic_balls: basicBalls.sort((a, b) => a - b).map(n => String(n).padStart(2, '0')),
+      special_ball: String(specialBall).padStart(2, '0')
     };
   }
 
@@ -177,8 +178,8 @@ export class QLCPredictor {
     const specialBall = smartSpecialSelection(this.historyData, {}, availableForSpecial);
     
     return {
-      basic_balls: basicBalls.sort((a, b) => a - b),
-      special_ball: specialBall
+      basic_balls: basicBalls.sort((a, b) => a - b).map(n => String(n).padStart(2, '0')),
+      special_ball: String(specialBall).padStart(2, '0')
     };
   }
 
@@ -205,8 +206,8 @@ export class QLCPredictor {
     const specialBall = smartSpecialSelection(this.historyData, specialFreq, availableForSpecial);
     
     return {
-      basic_balls: basicBalls.sort((a, b) => a - b),
-      special_ball: specialBall
+      basic_balls: basicBalls.sort((a, b) => a - b).map(n => String(n).padStart(2, '0')),
+      special_ball: String(specialBall).padStart(2, '0')
     };
   }
 

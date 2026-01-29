@@ -97,7 +97,9 @@ export class QXCPredictor {
 
       const numbers = strategy.generateNumbers(context);
       
-      const sortedCode = numbers.join(',');
+      // 七星彩：数据库存储的是排序后的格式
+      const sortedNumbers = [...numbers].sort((a, b) => a - b);
+      const sortedCode = sortedNumbers.map(n => String(n).padStart(2, '0')).join(',');
       
       const isDuplicate = 
         context.historicalCombinations.has(sortedCode) ||

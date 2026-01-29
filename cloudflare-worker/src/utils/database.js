@@ -587,11 +587,11 @@ export class Database {
 
   /**
    * 获取历史中奖组合（用于去重）
-   * 优化：只查询最近 50 条数据（免费计划优化）
+   * 查询全量数据，确保预测结果不会与任何历史中奖号码重复
    */
   async getHistoricalCombinations(table) {
     const results = await this.db
-      .prepare(`SELECT sorted_code FROM ${table}_lottery ORDER BY id DESC LIMIT 50`)
+      .prepare(`SELECT sorted_code FROM ${table}_lottery`)
       .all();
 
     return new Set(results.results.map(row => row.sorted_code));

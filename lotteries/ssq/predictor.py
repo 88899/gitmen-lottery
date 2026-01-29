@@ -37,22 +37,23 @@ class SSQPredictor(BasePredictor):
 
     def _analyze_history(self):
         """分析历史数据"""
-        self.historical_red_combinations = set()
+        self.historical_combinations = set()  # 完整组合（红球+蓝球）
         self.red_ball_frequency = Counter()
         self.blue_ball_frequency = Counter()
 
         for data in self.lottery_data:
-            red_balls = tuple(sorted(data['red_balls']))
+            # 保存完整的中奖组合（红球排序 + 蓝球）
+            red_balls_sorted = tuple(sorted(data['red_balls']))
             blue_ball = data['blue_ball']
+            sorted_code = ','.join([f"{x:02d}" for x in red_balls_sorted]) + f"-{blue_ball:02d}"
+            self.historical_combinations.add(sorted_code)
 
-            self.historical_red_combinations.add(red_balls)
-
+            # 统计频率
             for ball in data['red_balls']:
                 self.red_ball_frequency[ball] += 1
-
             self.blue_ball_frequency[blue_ball] += 1
 
-        logger.info(f"历史中奖组合数: {len(self.historical_red_combinations)}")
+        logger.info(f"历史中奖组合数: {len(self.historical_combinations)}")
 
     def _is_valid_combination(self, red_balls: List[int]) -> bool:
         """
@@ -200,7 +201,7 @@ class SSQPredictor(BasePredictor):
             'history_data': self.lottery_data,
             'red_frequency': dict(self.red_ball_frequency),
             'blue_frequency': dict(self.blue_ball_frequency),
-            'historical_combinations': self.historical_red_combinations
+            'historical_combinations': self.historical_combinations  # 使用完整组合
         }
         
         # 计算每个策略生成的组合数
@@ -239,7 +240,7 @@ class SSQPredictor(BasePredictor):
         context: Dict,
         existing_predictions: List[dict]
     ) -> List[dict]:
-        """使用指定策略生成预测（优化版：添加超时和减少尝试次数）
+        """使用指定策略生成预测（优化版：排除完整历史组合）
         
         Args:
             strategy_name: 策略名称
@@ -258,8 +259,9 @@ class SSQPredictor(BasePredictor):
         start_time = time.time()
         max_time = 5.0  # 最大执行时间 5 秒（优化）
         attempts = 0
+        duplicate_count = 0  # 统计重复次数
         
-        logger.info(f"使用 {strategy.name} 生成 {count} 个组合...")
+        logger.info(f"使用 {strategy.name} 生成 {count} 个组合（已排除 {len(context['historical_combinations'])} 个历史组合）...")
         
         while len(predictions) < count and attempts < max_attempts:
             attempts += 1
@@ -273,25 +275,36 @@ class SSQPredictor(BasePredictor):
             red_balls = strategy.generate_red_balls(context)
             blue_ball = strategy.generate_blue_ball(context)
             
-            # 检查是否重复
-            sorted_code = tuple(sorted(red_balls))
+            # 生成 sorted_code（红球排序 + 蓝球）
+            sorted_red = sorted(red_balls)
+            sorted_code = ','.join([f"{x:02d}" for x in sorted_red]) + f"-{blue_ball:02d}"
             
+            # 检查是否与历史组合重复
             is_duplicate = (
                 sorted_code in context['historical_combinations'] or
-                any(tuple(sorted(p['red_balls'])) == sorted_code for p in existing_predictions) or
-                any(tuple(sorted(p['red_balls'])) == sorted_code for p in predictions)
+                any(
+                    ','.join([f"{x:02d}" for x in sorted(p['red_balls'])]) + f"-{p['blue_ball']:02d}" == sorted_code
+                    for p in existing_predictions
+                ) or
+                any(
+                    ','.join([f"{x:02d}" for x in sorted(p['red_balls'])]) + f"-{p['blue_ball']:02d}" == sorted_code
+                    for p in predictions
+                )
             )
             
-            if not is_duplicate:
+            if is_duplicate:
+                duplicate_count += 1
+            else:
                 predictions.append({
                     'red_balls': red_balls,
                     'blue_ball': blue_ball,
+                    'sorted_code': sorted_code,
                     'strategy': strategy_name,
                     'strategy_name': strategy.name,
                     'prediction_time': datetime.now().isoformat()
                 })
         
-        logger.info(f"{strategy.name} 生成了 {len(predictions)} 个组合（尝试 {attempts} 次）")
+        logger.info(f"{strategy.name} 生成了 {len(predictions)} 个组合（尝试 {attempts} 次，排除重复 {duplicate_count} 次）")
         return predictions
     
     @staticmethod

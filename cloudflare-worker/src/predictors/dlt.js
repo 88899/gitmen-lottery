@@ -120,8 +120,9 @@ export class DLTPredictor {
     const startTime = Date.now();
     const maxTime = 500; // 最大执行时间 500ms（免费计划优化）
     let attempts = 0;
+    let duplicateCount = 0; // 统计重复次数
 
-    console.log(`使用 ${strategy.name} 生成 ${count} 个组合...`);
+    console.log(`使用 ${strategy.name} 生成 ${count} 个组合（已排除 ${context.historicalCombinations.size} 个历史组合）...`);
 
     while (predictions.length < count && attempts < maxAttempts) {
       attempts++;
@@ -144,7 +145,9 @@ export class DLTPredictor {
         existingPredictions.some(p => p.sorted_code === sortedCode) ||
         predictions.some(p => p.sorted_code === sortedCode);
       
-      if (!isDuplicate) {
+      if (isDuplicate) {
+        duplicateCount++;
+      } else {
         predictions.push({
           front_balls: frontBalls,
           back_balls: backBalls,
@@ -156,7 +159,7 @@ export class DLTPredictor {
       }
     }
 
-    console.log(`${strategy.name} 生成了 ${predictions.length} 个组合（尝试 ${attempts} 次）`);
+    console.log(`${strategy.name} 生成了 ${predictions.length} 个组合（尝试 ${attempts} 次，排除重复 ${duplicateCount} 次）`);
     return predictions;
   }
 
