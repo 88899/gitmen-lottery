@@ -390,9 +390,9 @@ export const historyPageHTML = `<!DOCTYPE html>
       background: white;
       border-radius: 12px;
       padding: 0;
-      max-width: 95%;
-      width: 1200px;
-      max-height: 90vh;
+      max-width: 90%;
+      width: 600px;
+      max-height: 95vh;
       overflow: hidden;
       box-shadow: 0 10px 40px rgba(0,0,0,0.3);
       position: relative;
@@ -404,31 +404,32 @@ export const historyPageHTML = `<!DOCTYPE html>
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 20px 30px;
-      border-bottom: 2px solid #e0e0e0;
+      padding: 12px 20px;
+      border-bottom: 1px solid #e0e0e0;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
     }
     
     .prediction-header h2 {
-      font-size: 20px;
+      font-size: 16px;
       margin: 0;
+      font-weight: 600;
     }
     
     .prediction-header-actions {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
     }
     
     .btn-copy-modal {
-      padding: 8px 16px;
+      padding: 6px 12px;
       background: rgba(255, 255, 255, 0.2);
       color: white;
       border: 1px solid rgba(255, 255, 255, 0.3);
       border-radius: 6px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       transition: all 0.3s;
     }
     
@@ -444,12 +445,12 @@ export const historyPageHTML = `<!DOCTYPE html>
     .close-btn {
       background: none;
       border: none;
-      font-size: 28px;
+      font-size: 24px;
       color: white;
       cursor: pointer;
       padding: 0;
-      width: 32px;
-      height: 32px;
+      width: 28px;
+      height: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -464,22 +465,22 @@ export const historyPageHTML = `<!DOCTYPE html>
     .prediction-body {
       flex: 1;
       overflow-y: auto;
-      padding: 30px;
+      padding: 20px;
     }
     
     .prediction-item {
       background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
       border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 15px;
+      padding: 15px;
+      margin-bottom: 12px;
       border-left: 4px solid #667eea;
     }
     
     .prediction-footer {
-      padding: 15px 30px;
+      padding: 10px 20px;
       text-align: center;
       color: #999;
-      font-size: 12px;
+      font-size: 11px;
       border-top: 1px solid #e0e0e0;
       background: #f8f9fa;
     }
