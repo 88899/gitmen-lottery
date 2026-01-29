@@ -1255,8 +1255,7 @@ export default {
     // 历史记录查询API
     if (url.pathname.startsWith('/api/history/')) {
       try {
-        const db = new Database(env.DB);
-        const historyAPI = new HistoryAPI(db);
+        const historyAPI = new HistoryAPI(env.DB);
         
         // 提取彩票类型
         const parts = url.pathname.split('/').filter(p => p);
