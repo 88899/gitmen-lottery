@@ -49,12 +49,19 @@ export const historyPageHTML = `<!DOCTYPE html>
       font-size: 12px;
     }
     
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 20px 30px;
+      border-bottom: 1px solid #e0e0e0;
+      flex-wrap: wrap;
+    }
+    
     .lottery-tabs {
       display: flex;
       gap: 10px;
-      padding: 20px 30px;
       flex-wrap: wrap;
-      border-bottom: 1px solid #e0e0e0;
     }
     
     .lottery-tab {
@@ -79,73 +86,33 @@ export const historyPageHTML = `<!DOCTYPE html>
       border-color: transparent;
     }
     
-    .main-content {
+    .search-bar {
       display: flex;
-      min-height: 600px;
-    }
-    
-    .sidebar {
-      width: 320px;
-      background: #f8f9fa;
-      padding: 20px;
-      border-right: 1px solid #e0e0e0;
-      overflow-y: auto;
-      max-height: calc(100vh - 240px);
-    }
-    
-    .content-area {
+      gap: 10px;
       flex: 1;
-      padding: 30px;
-      overflow-y: auto;
+      align-items: center;
+      flex-wrap: wrap;
     }
     
-    .search-section {
-      margin-bottom: 25px;
-    }
-    
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 15px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #667eea;
-    }
-    
-    .search-field {
-      margin-bottom: 15px;
-    }
-    
-    .search-field label {
-      display: block;
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 5px;
-      font-weight: 500;
-    }
-    
-    .search-field input {
-      width: 100%;
-      padding: 8px 10px;
+    .search-input {
+      padding: 8px 12px;
       border: 1px solid #ddd;
       border-radius: 6px;
       font-size: 13px;
       transition: border-color 0.3s;
+      min-width: 140px;
     }
     
-    .search-field input:focus {
+    .search-input:focus {
       outline: none;
       border-color: #667eea;
     }
     
-    .search-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 15px;
+    .search-input::placeholder {
+      color: #999;
     }
     
     .btn {
-      flex: 1;
       padding: 8px 16px;
       border: none;
       border-radius: 6px;
@@ -153,6 +120,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       font-size: 13px;
       font-weight: 500;
       transition: all 0.3s;
+      white-space: nowrap;
     }
     
     .btn-primary {
@@ -173,6 +141,35 @@ export const historyPageHTML = `<!DOCTYPE html>
     
     .btn-secondary:hover {
       background: #f0f0f0;
+    }
+    
+    .main-content {
+      display: flex;
+      min-height: 600px;
+    }
+    
+    .sidebar {
+      width: 280px;
+      background: #f8f9fa;
+      padding: 20px;
+      border-right: 1px solid #e0e0e0;
+      overflow-y: auto;
+      max-height: calc(100vh - 200px);
+    }
+    
+    .content-area {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+    }
+    
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #667eea;
     }
     
     .ball-selector-section {
@@ -357,6 +354,15 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     @media (max-width: 1024px) {
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .search-bar {
+        width: 100%;
+      }
+      
       .main-content {
         flex-direction: column;
       }
@@ -370,6 +376,15 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     @media (max-width: 768px) {
+      .search-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .search-input {
+        width: 100%;
+      }
+      
       .history-table {
         font-size: 11px;
       }
@@ -400,39 +415,25 @@ export const historyPageHTML = `<!DOCTYPE html>
       <p>查询双色球、大乐透、七星彩、七乐彩的历史开奖记录</p>
     </div>
     
-    <div class="lottery-tabs">
-      <div class="lottery-tab active" data-type="ssq">双色球</div>
-      <div class="lottery-tab" data-type="dlt">大乐透</div>
-      <div class="lottery-tab" data-type="qxc">七星彩</div>
-      <div class="lottery-tab" data-type="qlc">七乐彩</div>
+    <div class="toolbar">
+      <div class="lottery-tabs">
+        <div class="lottery-tab active" data-type="ssq">双色球</div>
+        <div class="lottery-tab" data-type="dlt">大乐透</div>
+        <div class="lottery-tab" data-type="qxc">七星彩</div>
+        <div class="lottery-tab" data-type="qlc">七乐彩</div>
+      </div>
+      
+      <div class="search-bar">
+        <input type="text" id="issueNo" class="search-input" placeholder="期号：2025001">
+        <input type="date" id="drawDate" class="search-input">
+        <input type="text" id="numbers" class="search-input" placeholder="">
+        <button class="btn btn-primary" onclick="search()">查询</button>
+        <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
+      </div>
     </div>
     
     <div class="main-content">
       <div class="sidebar">
-        <div class="search-section">
-          <div class="section-title">查询条件</div>
-          
-          <div class="search-field">
-            <label>期号</label>
-            <input type="text" id="issueNo" placeholder="例如：2025001">
-          </div>
-          
-          <div class="search-field">
-            <label>开奖日期</label>
-            <input type="date" id="drawDate">
-          </div>
-          
-          <div class="search-field">
-            <label>号码查询</label>
-            <input type="text" id="numbers" placeholder="">
-          </div>
-          
-          <div class="search-actions">
-            <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
-            <button class="btn btn-primary" onclick="search()">查询</button>
-          </div>
-        </div>
-        
         <div class="ball-selector-section" id="redBallSection">
           <div class="section-title" id="redBallTitle">红球</div>
           <div class="ball-selector-group" id="redBallSelector"></div>
@@ -788,7 +789,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     // 回车搜索
-    document.querySelectorAll('.search-field input').forEach(input => {
+    document.querySelectorAll('.search-input').forEach(input => {
       input.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') search();
       });
