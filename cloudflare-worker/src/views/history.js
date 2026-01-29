@@ -355,6 +355,15 @@ export const historyPageHTML = `<!DOCTYPE html>
       font-size: 13px;
     }
     
+    .pagination button.btn-icon {
+      padding: 8px 12px;
+      font-size: 16px;
+      min-width: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
     .pagination button:hover:not(:disabled) {
       background: #667eea;
       color: white;
@@ -369,6 +378,8 @@ export const historyPageHTML = `<!DOCTYPE html>
     .pagination .page-info {
       color: #666;
       font-size: 13px;
+      padding: 0 10px;
+      white-space: nowrap;
     }
     
     .empty-state {
@@ -703,19 +714,30 @@ export const historyPageHTML = `<!DOCTYPE html>
       
       /* 分页优化 */
       .pagination {
-        flex-direction: column;
-        gap: 10px;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 8px;
         padding: 15px;
+        justify-content: space-between;
       }
       
       .pagination button {
-        padding: 12px;
-        font-size: 14px;
+        padding: 10px;
+        font-size: 18px;
+        flex: 0 0 auto;
+      }
+      
+      .pagination button.btn-icon {
+        min-width: 44px;
+        padding: 10px;
       }
       
       .page-info {
-        font-size: 13px;
-        order: -1;
+        font-size: 14px;
+        order: 0;
+        flex: 1;
+        text-align: center;
+        font-weight: 500;
       }
       
       /* 预测弹窗优化 */
@@ -1132,14 +1154,30 @@ export const historyPageHTML = `<!DOCTYPE html>
         return;
       }
       
+      // 检测是否为移动端
+      const isMobile = window.innerWidth <= 768;
+      
       pagination.style.display = 'flex';
-      pagination.innerHTML = \`
-        <button onclick="goToPage(1)" \${page === 1 ? 'disabled' : ''}">首页</button>
-        <button onclick="goToPage(\${page - 1})" \${page === 1 ? 'disabled' : ''}">上一页</button>
-        <span class="page-info">第 \${page} / \${totalPages} 页 (共 \${total} 条)</span>
-        <button onclick="goToPage(\${page + 1})" \${page === totalPages ? 'disabled' : ''}">下一页</button>
-        <button onclick="goToPage(\${totalPages})" \${page === totalPages ? 'disabled' : ''}">末页</button>
-      \`;
+      
+      if (isMobile) {
+        // 移动端：使用箭头和简化布局
+        pagination.innerHTML = \`
+          <button onclick="goToPage(1)" \${page === 1 ? 'disabled' : ''} class="btn-icon" title="首页">⏮</button>
+          <button onclick="goToPage(\${page - 1})" \${page === 1 ? 'disabled' : ''} class="btn-icon" title="上一页">◀</button>
+          <span class="page-info">\${page} / \${totalPages}</span>
+          <button onclick="goToPage(\${page + 1})" \${page === totalPages ? 'disabled' : ''} class="btn-icon" title="下一页">▶</button>
+          <button onclick="goToPage(\${totalPages})" \${page === totalPages ? 'disabled' : ''} class="btn-icon" title="末页">⏭</button>
+        \`;
+      } else {
+        // 桌面端：使用文字
+        pagination.innerHTML = \`
+          <button onclick="goToPage(1)" \${page === 1 ? 'disabled' : ''}>首页</button>
+          <button onclick="goToPage(\${page - 1})" \${page === 1 ? 'disabled' : ''}>上一页</button>
+          <span class="page-info">第 \${page} / \${totalPages} 页 (共 \${total} 条)</span>
+          <button onclick="goToPage(\${page + 1})" \${page === totalPages ? 'disabled' : ''}>下一页</button>
+          <button onclick="goToPage(\${totalPages})" \${page === totalPages ? 'disabled' : ''}>末页</button>
+        \`;
+      }
     }
     
     // 跳转页面
