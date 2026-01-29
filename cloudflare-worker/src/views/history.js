@@ -1111,7 +1111,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       htmlParts.push('    alert("复制失败: " + err.message);');
       htmlParts.push('  });');
       htmlParts.push('}');
-      htmlParts.push('</script>');
+      htmlParts.push('<' + '/script>');
       htmlParts.push('</body>');
       htmlParts.push('</html>');
       
