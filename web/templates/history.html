@@ -1039,30 +1039,30 @@
     
     // 生成预测结果的文本格式
     function generatePredictionText(predictions, config) {
-      let text = config.name + ' - 预测结果\\n';
-      text += '生成时间：' + new Date().toLocaleString('zh-CN') + '\\n';
-      text += '==================================================\\n\\n';
+      let text = config.name + ' - 预测结果\n';
+      text += '生成时间：' + new Date().toLocaleString('zh-CN') + '\n';
+      text += '==================================================\n\n';
       
       predictions.forEach(pred => {
-        text += '第 ' + pred.rank + ' 注 [' + (pred.strategy_name || pred.strategy) + ']\\n';
+        text += '第 ' + pred.rank + ' 注 [' + (pred.strategy_name || pred.strategy) + ']\n';
         
         if (currentType === 'ssq') {
-          text += '红球：' + pred.red_balls.join(', ') + '\\n';
-          text += '蓝球：' + pred.blue_ball + '\\n';
+          text += '红球：' + pred.red_balls.join(', ') + '\n';
+          text += '蓝球：' + pred.blue_ball + '\n';
         } else if (currentType === 'dlt') {
-          text += '前区：' + pred.front_balls.join(', ') + '\\n';
-          text += '后区：' + pred.back_balls.join(', ') + '\\n';
+          text += '前区：' + pred.front_balls.join(', ') + '\n';
+          text += '后区：' + pred.back_balls.join(', ') + '\n';
         } else if (currentType === 'qxc') {
-          text += '号码：' + pred.numbers.join(', ') + '\\n';
+          text += '号码：' + pred.numbers.join(', ') + '\n';
         } else if (currentType === 'qlc') {
-          text += '基本号：' + pred.basic_balls.join(', ') + '\\n';
-          text += '特别号：' + pred.special_ball + '\\n';
+          text += '基本号：' + pred.basic_balls.join(', ') + '\n';
+          text += '特别号：' + pred.special_ball + '\n';
         }
         
-        text += '\\n';
+        text += '\n';
       });
       
-      text += '==================================================\\n';
+      text += '==================================================\n';
       text += '⚠️ 预测结果仅供参考，不构成任何投注建议';
       
       return text;
