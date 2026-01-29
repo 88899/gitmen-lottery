@@ -389,63 +389,34 @@ export const historyPageHTML = `<!DOCTYPE html>
     .prediction-content {
       background: white;
       border-radius: 12px;
-      padding: 0;
-      max-width: 95%;
-      width: 1200px;
-      max-height: 90vh;
-      overflow: hidden;
+      padding: 30px;
+      max-width: 800px;
+      max-height: 80vh;
+      overflow-y: auto;
       box-shadow: 0 10px 40px rgba(0,0,0,0.3);
       position: relative;
-      display: flex;
-      flex-direction: column;
     }
     
     .prediction-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 20px 30px;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
       border-bottom: 2px solid #e0e0e0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
     }
     
     .prediction-header h2 {
       font-size: 20px;
+      color: #333;
       margin: 0;
-    }
-    
-    .prediction-header-actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-    
-    .btn-copy-modal {
-      padding: 8px 16px;
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: all 0.3s;
-    }
-    
-    .btn-copy-modal:hover {
-      background: rgba(255, 255, 255, 0.3);
-    }
-    
-    .btn-copy-modal.copied {
-      background: rgba(56, 239, 125, 0.3);
-      border-color: rgba(56, 239, 125, 0.5);
     }
     
     .close-btn {
       background: none;
       border: none;
       font-size: 28px;
-      color: white;
+      color: #999;
       cursor: pointer;
       padding: 0;
       width: 32px;
@@ -458,19 +429,14 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .close-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
-    }
-    
-    .prediction-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 30px;
+      background: #f0f0f0;
+      color: #333;
     }
     
     .prediction-item {
       background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
       border-radius: 8px;
-      padding: 20px;
+      padding: 15px;
       margin-bottom: 15px;
       border-left: 4px solid #667eea;
     }
@@ -512,15 +478,6 @@ export const historyPageHTML = `<!DOCTYPE html>
       padding: 15px;
       border-radius: 6px;
       margin-bottom: 20px;
-    }
-    
-    .prediction-footer {
-      padding: 15px 30px;
-      text-align: center;
-      color: #999;
-      font-size: 12px;
-      border-top: 1px solid #e0e0e0;
-      background: #f8f9fa;
     }
     
     @media (max-width: 1024px) {
@@ -636,24 +593,16 @@ export const historyPageHTML = `<!DOCTYPE html>
     </div>
   </div>
   
-  <!-- 预测弹窗（备用方案） -->
+  <!-- 预测弹窗 -->
   <div id="predictionModal" class="prediction-modal">
     <div class="prediction-content">
       <div class="prediction-header">
         <h2 id="predictionTitle">预测结果</h2>
-        <div class="prediction-header-actions">
-          <button class="btn-copy-modal" onclick="copyModalToClipboard()">📋 复制</button>
-          <button class="close-btn" onclick="closePrediction()">&times;</button>
-        </div>
+        <button class="close-btn" onclick="closePrediction()">&times;</button>
       </div>
-      <div class="prediction-body">
-        <div id="predictionLoading" class="prediction-loading" style="display: none;">正在生成预测...</div>
-        <div id="predictionError" class="prediction-error" style="display: none;"></div>
-        <div id="predictionResults"></div>
-      </div>
-      <div class="prediction-footer">
-        <p>⚠️ 预测结果仅供参考，不构成任何投注建议</p>
-      </div>
+      <div id="predictionLoading" class="prediction-loading" style="display: none;">正在生成预测...</div>
+      <div id="predictionError" class="prediction-error" style="display: none;"></div>
+      <div id="predictionResults"></div>
     </div>
   </div>
   
@@ -711,7 +660,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       for (let i = config.redRange[0]; i <= config.redRange[1]; i++) {
         // 七星彩不补零，其他彩票补零
         const num = currentType === 'qxc' ? String(i) : String(i).padStart(2, '0');
-        redHtml += '<div class="selectable-ball red" data-type="red" data-value="' + num + '">' + num + '</div>';
+        redHtml += \`<div class="selectable-ball red" data-type="red" data-value="\${num}">\${num}</div>\`;
       }
       redContainer.innerHTML = redHtml;
       
@@ -725,7 +674,7 @@ export const historyPageHTML = `<!DOCTYPE html>
         let blueHtml = '';
         for (let i = config.blueRange[0]; i <= config.blueRange[1]; i++) {
           const num = String(i).padStart(2, '0');
-          blueHtml += '<div class="selectable-ball blue" data-type="blue" data-value="' + num + '">' + num + '</div>';
+          blueHtml += \`<div class="selectable-ball blue" data-type="blue" data-value="\${num}">\${num}</div>\`;
         }
         blueContainer.innerHTML = blueHtml;
       } else {
@@ -837,7 +786,7 @@ export const historyPageHTML = `<!DOCTYPE html>
           ...currentFilters
         });
         
-        const response = await fetch('/api/history/' + currentType + '?' + params);
+        const response = await fetch(\`/api/history/\${currentType}?\${params}\`);
         const data = await response.json();
         
         if (!data.success) {
@@ -859,7 +808,14 @@ export const historyPageHTML = `<!DOCTYPE html>
       const results = document.getElementById('results');
       
       if (!data || data.length === 0) {
-        results.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><p>暂无数据</p></div>';
+        results.innerHTML = \`
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            <p>暂无数据</p>
+          </div>
+        \`;
         return;
       }
       
@@ -880,20 +836,20 @@ export const historyPageHTML = `<!DOCTYPE html>
       
       data.forEach(item => {
         tableHTML += '<tr>';
-        tableHTML += '<td><strong>' + item.lottery_no + '</strong></td>';
-        tableHTML += '<td>' + item.draw_date + '</td>';
+        tableHTML += \`<td><strong>\${item.lottery_no}</strong></td>\`;
+        tableHTML += \`<td>\${item.draw_date}</td>\`;
         
         if (currentType === 'ssq') {
-          tableHTML += '<td><div class="balls-container">' + renderBalls(item.red_balls, 'red') + '</div></td>';
-          tableHTML += '<td><div class="balls-container">' + renderBall(item.blue_ball, 'blue') + '</div></td>';
+          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.red_balls, 'red')}</div></td>\`;
+          tableHTML += \`<td><div class="balls-container">\${renderBall(item.blue_ball, 'blue')}</div></td>\`;
         } else if (currentType === 'dlt') {
-          tableHTML += '<td><div class="balls-container">' + renderBalls(item.front_balls, 'front') + '</div></td>';
-          tableHTML += '<td><div class="balls-container">' + renderBalls(item.back_balls, 'back') + '</div></td>';
+          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.front_balls, 'front')}</div></td>\`;
+          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.back_balls, 'back')}</div></td>\`;
         } else if (currentType === 'qxc') {
-          tableHTML += '<td><div class="balls-container">' + renderBalls(item.numbers, 'number') + '</div></td>';
+          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.numbers, 'number')}</div></td>\`;
         } else if (currentType === 'qlc') {
-          tableHTML += '<td><div class="balls-container">' + renderBalls(item.basic_balls, 'basic') + '</div></td>';
-          tableHTML += '<td><div class="balls-container">' + renderBall(item.special_ball, 'special') + '</div></td>';
+          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.basic_balls, 'basic')}</div></td>\`;
+          tableHTML += \`<td><div class="balls-container">\${renderBall(item.special_ball, 'special')}</div></td>\`;
         }
         
         tableHTML += '</tr>';
@@ -911,7 +867,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     function renderBall(ball, type) {
-      return '<div class="ball ball-' + type + '">' + ball + '</div>';
+      return \`<div class="ball ball-\${type}">\${ball}</div>\`;
     }
     
     // 渲染分页
@@ -924,11 +880,13 @@ export const historyPageHTML = `<!DOCTYPE html>
       }
       
       pagination.style.display = 'flex';
-      pagination.innerHTML = '<button onclick="goToPage(1)" ' + (page === 1 ? 'disabled' : '') + '>首页</button>' +
-        '<button onclick="goToPage(' + (page - 1) + ')" ' + (page === 1 ? 'disabled' : '') + '>上一页</button>' +
-        '<span class="page-info">第 ' + page + ' / ' + totalPages + ' 页 (共 ' + total + ' 条)</span>' +
-        '<button onclick="goToPage(' + (page + 1) + ')" ' + (page === totalPages ? 'disabled' : '') + '>下一页</button>' +
-        '<button onclick="goToPage(' + totalPages + ')" ' + (page === totalPages ? 'disabled' : '') + '>末页</button>';
+      pagination.innerHTML = \`
+        <button onclick="goToPage(1)" \${page === 1 ? 'disabled' : ''}">首页</button>
+        <button onclick="goToPage(\${page - 1})" \${page === 1 ? 'disabled' : ''}">上一页</button>
+        <span class="page-info">第 \${page} / \${totalPages} 页 (共 \${total} 条)</span>
+        <button onclick="goToPage(\${page + 1})" \${page === totalPages ? 'disabled' : ''}">下一页</button>
+        <button onclick="goToPage(\${totalPages})" \${page === totalPages ? 'disabled' : ''}">末页</button>
+      \`;
     }
     
     // 跳转页面
@@ -995,6 +953,46 @@ export const historyPageHTML = `<!DOCTYPE html>
     initBallSelector();
     loadData();
     
+    // 显示预测
+    async function showPrediction() {
+      const modal = document.getElementById('predictionModal');
+      const loading = document.getElementById('predictionLoading');
+      const error = document.getElementById('predictionError');
+      const results = document.getElementById('predictionResults');
+      const title = document.getElementById('predictionTitle');
+      
+      // 显示弹窗
+      modal.classList.add('show');
+      loading.style.display = 'block';
+      error.style.display = 'none';
+      results.innerHTML = '';
+      
+      // 更新标题
+      const config = lotteryConfig[currentType];
+      title.textContent = \`\${config.name} - 预测结果\`;
+      
+      try {
+        const response = await fetch(\`/predict/\${currentType}?count=5\`);
+        const data = await response.json();
+        
+        if (!data || !data.predictions || data.predictions.length === 0) {
+          throw new Error('预测结果为空');
+        }
+        
+        renderPredictions(data.predictions);
+      } catch (err) {
+        error.textContent = '预测失败: ' + err.message;
+        error.style.display = 'block';
+      } finally {
+        loading.style.display = 'none';
+      }
+    }
+    
+    // 关闭预测弹窗
+    function closePrediction() {
+      document.getElementById('predictionModal').classList.remove('show');
+    }
+    
     // 点击弹窗外部关闭
     document.getElementById('predictionModal').addEventListener('click', function(e) {
       if (e.target === this) {
@@ -1002,85 +1000,17 @@ export const historyPageHTML = `<!DOCTYPE html>
       }
     });
     
-    // 显示预测
-    async function showPrediction() {
-      const modal = document.getElementById('predictionModal');
-      const title = document.getElementById('predictionTitle');
-      const loading = document.getElementById('predictionLoading');
-      const error = document.getElementById('predictionError');
+    // 渲染预测结果
+    function renderPredictions(predictions) {
       const results = document.getElementById('predictionResults');
-      
-      // 显示弹窗和加载状态
-      modal.classList.add('show');
-      loading.style.display = 'block';
-      error.style.display = 'none';
-      results.innerHTML = '';
-      
-      try {
-        const config = lotteryConfig[currentType];
-        title.textContent = config.name + ' - 预测结果';
-        
-        const response = await fetch('/predict/' + currentType + '?count=5');
-        const data = await response.json();
-        
-        if (!data || !data.predictions || data.predictions.length === 0) {
-          throw new Error('预测结果为空');
-        }
-        
-        // 保存预测数据供复制使用
-        window.currentPredictions = data.predictions;
-        
-        // 渲染预测结果
-        results.innerHTML = renderModalPredictions(data.predictions);
-        loading.style.display = 'none';
-      } catch (err) {
-        loading.style.display = 'none';
-        error.textContent = '预测失败: ' + err.message;
-        error.style.display = 'block';
-      }
-    }
-    
-    // 生成预测结果的文本格式
-    function generatePredictionText(predictions, config) {
-      let text = config.name + ' - 预测结果\n';
-      text += '生成时间：' + new Date().toLocaleString('zh-CN') + '\n';
-      text += '==================================================\n\n';
-      
-      predictions.forEach(pred => {
-        text += '第 ' + pred.rank + ' 注 [' + (pred.strategy_name || pred.strategy) + ']\n';
-        
-        if (currentType === 'ssq') {
-          text += '红球：' + pred.red_balls.join(', ') + '\n';
-          text += '蓝球：' + pred.blue_ball + '\n';
-        } else if (currentType === 'dlt') {
-          text += '前区：' + pred.front_balls.join(', ') + '\n';
-          text += '后区：' + pred.back_balls.join(', ') + '\n';
-        } else if (currentType === 'qxc') {
-          text += '号码：' + pred.numbers.join(', ') + '\n';
-        } else if (currentType === 'qlc') {
-          text += '基本号：' + pred.basic_balls.join(', ') + '\n';
-          text += '特别号：' + pred.special_ball + '\n';
-        }
-        
-        text += '\n';
-      });
-      
-      text += '==================================================\n';
-      text += '⚠️ 预测结果仅供参考，不构成任何投注建议';
-      
-      return text;
-    }
-    
-    // 渲染弹窗中的预测结果
-    function renderModalPredictions(predictions) {
       let html = '';
       
       predictions.forEach(pred => {
         html += '<div class="prediction-item">';
-        html += '<div>';
-        html += '<span class="prediction-rank">第 ' + pred.rank + ' 注</span>';
-        html += '<span class="prediction-strategy">' + (pred.strategy_name || pred.strategy) + '</span>';
-        html += '</div>';
+        html += \`<div>\`;
+        html += \`<span class="prediction-rank">第 \${pred.rank} 注</span>\`;
+        html += \`<span class="prediction-strategy">\${pred.strategy_name || pred.strategy}</span>\`;
+        html += \`</div>\`;
         html += '<div class="prediction-balls">';
         
         if (currentType === 'ssq') {
@@ -1108,36 +1038,7 @@ export const historyPageHTML = `<!DOCTYPE html>
         html += '</div>';
       });
       
-      return html;
-    }
-    
-    // 关闭预测弹窗
-    function closePrediction() {
-      document.getElementById('predictionModal').classList.remove('show');
-    }
-    
-    // 复制弹窗中的预测结果到剪贴板
-    function copyModalToClipboard() {
-      if (!window.currentPredictions) {
-        alert('没有可复制的预测结果');
-        return;
-      }
-      
-      const config = lotteryConfig[currentType];
-      const textContent = generatePredictionText(window.currentPredictions, config);
-      const btn = document.querySelector('.btn-copy-modal');
-      
-      navigator.clipboard.writeText(textContent).then(() => {
-        btn.textContent = '✓ 已复制';
-        btn.classList.add('copied');
-        
-        setTimeout(() => {
-          btn.textContent = '📋 复制';
-          btn.classList.remove('copied');
-        }, 2000);
-      }).catch(err => {
-        alert('复制失败: ' + err.message);
-      });
+      results.innerHTML = html;
     }
   </script>
 </body>
