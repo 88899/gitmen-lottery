@@ -156,9 +156,13 @@ export class HistoryAPI {
   }
 
   /**
-   * 构建号码查询条件（优化版）
+   * 构建号码查询条件（优化版 - 使用 sorted_code）
    * @param {string} type - 彩票类型
-   * @param {string} numbers - 号码字符串，例如："01,02,08-06" 或 "01"（只查红球）或 "-06"（只查蓝球）
+   * @param {string} numbers - 号码字符串
+   *   - 双色球："02,06,08,12,22,31-22" 或 "08"（查询包含该号码）
+   *   - 大乐透："01,02,03,04,05-06,07" 或 "08"（查询包含该号码）
+   *   - 七星彩："8,5,5,8,5,1,1"（用户输入位置顺序，需要转换为排序后的格式）
+   *   - 七乐彩："04,14,19,22,26,29,30-11" 或 "08"（查询包含该号码）
    */
   buildNumberConditions(type, numbers) {
     try {
@@ -169,194 +173,86 @@ export class HistoryAPI {
       
       const numbersStr = String(numbers).trim();
       
-      if (type === 'ssq') {
-        // 双色球：红球-蓝球
-        const parts = numbersStr.split('-');
-        const conditions = [];
-        const params = [];
+      // 检查是否是完整的号码组合（包含分隔符 - 或逗号）
+      const hasFullFormat = numbersStr.includes(',') || numbersStr.includes('-');
+      
+      if (hasFullFormat) {
+        // 完整号码组合：直接使用 sorted_code 精确匹配
+        // 需要对输入进行格式化处理
+        let formattedCode = '';
         
-        // 红球查询
-        if (parts[0] && parts[0].length > 0) {
-          const redBalls = parts[0].split(',').map(n => n.trim()).filter(n => n);
-          // 安全验证：红球数量限制
-          if (redBalls.length > 6) {
-            throw new Error('红球数量不能超过6个');
+        if (type === 'ssq') {
+          // 双色球：红球需要排序，格式：02,06,08,12,22,31-03
+          const parts = numbersStr.split('-');
+          if (parts[0]) {
+            const redBalls = parts[0].split(',').map(n => n.trim().padStart(2, '0')).filter(n => n);
+            redBalls.sort();
+            formattedCode = redBalls.join(',');
           }
-          
-          redBalls.forEach(ball => {
-            // 安全验证：红球范围
-            if (!/^[0-9]{1,2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 33) {
-              throw new Error('红球号码无效');
-            }
-            const paddedBall = ball.padStart(2, '0');
-            const redConditions = [];
-            for (let i = 1; i <= 6; i++) {
-              redConditions.push(`red${i} = ?`);
-              params.push(paddedBall);
-            }
-            conditions.push(`(${redConditions.join(' OR ')})`);
-          });
-        }
-        
-        // 蓝球查询
-        if (parts.length > 1 && parts[1] && parts[1].length > 0) {
-          const blueBalls = parts[1].split(',').map(n => n.trim()).filter(n => n);
-          blueBalls.forEach(blueBall => {
-            // 安全验证：蓝球范围
-            if (!/^[0-9]{1,2}$/.test(blueBall) || parseInt(blueBall) < 1 || parseInt(blueBall) > 16) {
-              throw new Error('蓝球号码无效');
-            }
-            const paddedBall = blueBall.padStart(2, '0');
-            conditions.push('blue = ?');
-            params.push(paddedBall);
-          });
-        }
-        
-        return conditions.length > 0 ? {
-          condition: conditions.join(' AND '),
-          params: params
-        } : null;
-      } else if (type === 'dlt') {
-        // 大乐透：前区-后区
-        const parts = numbersStr.split('-');
-        const conditions = [];
-        const params = [];
-        
-        // 前区查询
-        if (parts[0] && parts[0].length > 0) {
-          const frontBalls = parts[0].split(',').map(n => n.trim()).filter(n => n);
-          // 安全验证：前区数量限制
-          if (frontBalls.length > 5) {
-            throw new Error('前区号码不能超过5个');
+          if (parts.length > 1 && parts[1]) {
+            const blueBall = parts[1].trim().padStart(2, '0');
+            formattedCode += '-' + blueBall;
           }
-          
-          frontBalls.forEach(ball => {
-            // 安全验证：前区范围
-            if (!/^[0-9]{1,2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 35) {
-              throw new Error('前区号码无效');
-            }
-            const paddedBall = ball.padStart(2, '0');
-            const frontConditions = [];
-            for (let i = 1; i <= 5; i++) {
-              frontConditions.push(`front${i} = ?`);
-              params.push(paddedBall);
-            }
-            conditions.push(`(${frontConditions.join(' OR ')})`);
-          });
-        }
-        
-        // 后区查询
-        if (parts.length > 1 && parts[1] && parts[1].length > 0) {
-          const backBalls = parts[1].split(',').map(n => n.trim()).filter(n => n);
-          // 安全验证：后区数量限制
-          if (backBalls.length > 2) {
-            throw new Error('后区号码不能超过2个');
+        } else if (type === 'dlt') {
+          // 大乐透：前区和后区都需要排序，格式：01,02,03,04,05-06,07
+          const parts = numbersStr.split('-');
+          if (parts[0]) {
+            const frontBalls = parts[0].split(',').map(n => n.trim().padStart(2, '0')).filter(n => n);
+            frontBalls.sort();
+            formattedCode = frontBalls.join(',');
           }
-          
-          backBalls.forEach(ball => {
-            // 安全验证：后区范围
-            if (!/^[0-9]{1,2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 12) {
-              throw new Error('后区号码无效');
-            }
-            const paddedBall = ball.padStart(2, '0');
-            const backConditions = [];
-            for (let i = 1; i <= 2; i++) {
-              backConditions.push(`back${i} = ?`);
-              params.push(paddedBall);
-            }
-            conditions.push(`(${backConditions.join(' OR ')})`);
-          });
-        }
-        
-        return conditions.length > 0 ? {
-          condition: conditions.join(' AND '),
-          params: params
-        } : null;
-      } else if (type === 'qxc') {
-        // 七星彩：7位数字（0-9）
-        const nums = numbersStr.split(',').map(n => n.trim()).filter(n => n);
-        // 安全验证：数量限制
-        if (nums.length > 7) {
-          throw new Error('号码数量不能超过7个');
-        }
-        
-        if (nums.length > 0) {
-          const conditions = [];
-          const params = [];
-          
-          nums.forEach(num => {
-            // 移除前导零（如果有）
-            const cleanNum = String(parseInt(num));
-            // 安全验证：号码范围
-            if (!/^[0-9]$/.test(cleanNum)) {
-              throw new Error('号码无效');
-            }
-            const numConditions = [];
-            for (let i = 1; i <= 7; i++) {
-              numConditions.push(`num${i} = ?`);
-              params.push(cleanNum);
-            }
-            conditions.push(`(${numConditions.join(' OR ')})`);
-          });
-          
-          return {
-            condition: conditions.join(' AND '),
-            params: params
-          };
-        }
-      } else if (type === 'qlc') {
-        // 七乐彩：基本号-特别号
-        const parts = numbersStr.split('-');
-        const conditions = [];
-        const params = [];
-        
-        // 基本号查询
-        if (parts[0] && parts[0].length > 0) {
-          const basicBalls = parts[0].split(',').map(n => n.trim()).filter(n => n);
-          // 安全验证：基本号数量限制
-          if (basicBalls.length > 7) {
-            throw new Error('基本号数量不能超过7个');
+          if (parts.length > 1 && parts[1]) {
+            const backBalls = parts[1].split(',').map(n => n.trim().padStart(2, '0')).filter(n => n);
+            backBalls.sort();
+            formattedCode += '-' + backBalls.join(',');
           }
-          
-          basicBalls.forEach(ball => {
-            // 安全验证：基本号范围
-            if (!/^[0-9]{1,2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 30) {
-              throw new Error('基本号号码无效');
-            }
-            const paddedBall = ball.padStart(2, '0');
-            const basicConditions = [];
-            for (let i = 1; i <= 7; i++) {
-              basicConditions.push(`basic${i} = ?`);
-              params.push(paddedBall);
-            }
-            conditions.push(`(${basicConditions.join(' OR ')})`);
-          });
+        } else if (type === 'qxc') {
+          // 七星彩：用户输入位置顺序（如 8,5,5,8,5,1,1），需要排序并补零
+          // 数据库存储格式：01,01,05,05,08,08,08（排序后补零）
+          const nums = numbersStr.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+          if (nums.length === 7) {
+            // 排序并补零
+            const sortedNums = [...nums].sort((a, b) => a - b);
+            formattedCode = sortedNums.map(n => String(n).padStart(2, '0')).join(',');
+          }
+        } else if (type === 'qlc') {
+          // 七乐彩：基本号需要排序，格式：01,02,03,04,05,06,07-08
+          const parts = numbersStr.split('-');
+          if (parts[0]) {
+            const basicBalls = parts[0].split(',').map(n => n.trim().padStart(2, '0')).filter(n => n);
+            basicBalls.sort();
+            formattedCode = basicBalls.join(',');
+          }
+          if (parts.length > 1 && parts[1]) {
+            const specialBall = parts[1].trim().padStart(2, '0');
+            formattedCode += '-' + specialBall;
+          }
         }
         
-        // 特别号查询
-        if (parts.length > 1 && parts[1] && parts[1].length > 0) {
-          const specialBalls = parts[1].split(',').map(n => n.trim()).filter(n => n);
-          specialBalls.forEach(specialBall => {
-            // 安全验证：特别号范围
-            if (!/^[0-9]{1,2}$/.test(specialBall) || parseInt(specialBall) < 1 || parseInt(specialBall) > 30) {
-              throw new Error('特别号号码无效');
-            }
-            const paddedBall = specialBall.padStart(2, '0');
-            conditions.push('special = ?');
-            params.push(paddedBall);
-          });
+        // 使用 sorted_code 精确匹配
+        return {
+          condition: 'sorted_code = ?',
+          params: [formattedCode]
+        };
+      } else {
+        // 单个号码：使用 LIKE 模糊匹配
+        let searchPattern = '';
+        
+        if (type === 'ssq' || type === 'dlt' || type === 'qlc' || type === 'qxc') {
+          // 所有类型都需要补零到两位（因为数据库中都是补零存储的）
+          searchPattern = numbersStr.padStart(2, '0');
         }
         
-        return conditions.length > 0 ? {
-          condition: conditions.join(' AND '),
-          params: params
-        } : null;
+        // 使用 LIKE 查询包含该号码的记录
+        return {
+          condition: 'sorted_code LIKE ?',
+          params: [`%${searchPattern}%`]
+        };
       }
       
-      return null;
     } catch (error) {
       console.error('构建号码查询条件失败:', error);
-      throw error; // 抛出错误以便前端显示
+      throw error;
     }
   }
 }

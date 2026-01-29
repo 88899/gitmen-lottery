@@ -62,6 +62,28 @@ export const historyPageHTML = `<!DOCTYPE html>
       flex-wrap: wrap;
     }
     
+    .lottery-tab {
+      padding: 10px 20px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .lottery-tab:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+    
+    .lottery-tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: transparent;
+    }
+    
     .toolbar-spacer {
       flex: 1;
       min-width: 20px;
