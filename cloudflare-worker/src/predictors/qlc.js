@@ -57,13 +57,17 @@ export class QLCPredictor {
         predictions.push({
           ...prediction,
           sorted_code: sortedCode,
-          rank: predictions.length + 1,
           strategy: strategy,
           strategy_name: this.getStrategyName(strategy)
         });
         usedCombinations.add(sortedCode);
       }
     }
+    
+    // 添加排名
+    predictions.forEach((pred, index) => {
+      pred.rank = index + 1;
+    });
     
     console.log(`生成 ${predictions.length} 个七乐彩预测（尝试 ${attempts} 次）`);
     return predictions;

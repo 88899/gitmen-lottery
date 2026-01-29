@@ -83,7 +83,6 @@ export class SSQPredictor {
         }
       }
 
-      // 截取到指定数量
       const finalPredictions = predictions.slice(0, count);
       
       // 添加排名

@@ -66,7 +66,14 @@ export class QXCPredictor {
         }
       }
       
-      return predictions.slice(0, count);
+      const finalPredictions = predictions.slice(0, count);
+      
+      // 添加排名
+      finalPredictions.forEach((pred, index) => {
+        pred.rank = index + 1;
+      });
+      
+      return finalPredictions;
       
     } catch (error) {
       console.error('七星彩预测失败:', error);
