@@ -158,7 +158,7 @@ export class HistoryAPI {
   /**
    * 构建号码查询条件（优化版）
    * @param {string} type - 彩票类型
-   * @param {string} numbers - 号码字符串，例如："01,02,08-06"
+   * @param {string} numbers - 号码字符串，例如："01,02,08-06" 或 "01"（只查红球）或 "-06"（只查蓝球）
    */
   buildNumberConditions(type, numbers) {
     try {
@@ -175,7 +175,8 @@ export class HistoryAPI {
         const conditions = [];
         const params = [];
         
-        if (parts[0]) {
+        // 红球查询
+        if (parts[0] && parts[0].length > 0) {
           const redBalls = parts[0].split(',').map(n => n.trim()).filter(n => n);
           // 安全验证：红球数量限制
           if (redBalls.length > 6) {
@@ -184,26 +185,31 @@ export class HistoryAPI {
           
           redBalls.forEach(ball => {
             // 安全验证：红球范围
-            if (!/^[0-9]{2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 33) {
+            if (!/^[0-9]{1,2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 33) {
               throw new Error('红球号码无效');
             }
+            const paddedBall = ball.padStart(2, '0');
             const redConditions = [];
             for (let i = 1; i <= 6; i++) {
-              redConditions.push(`red${i} = ?`);
-              params.push(ball);
+              redConditions.push(\`red\${i} = ?\`);
+              params.push(paddedBall);
             }
-            conditions.push(`(${redConditions.join(' OR ')})`);
+            conditions.push(\`(\${redConditions.join(' OR ')})\`);
           });
         }
         
-        if (parts[1]) {
-          const blueBall = parts[1].trim();
-          // 安全验证：蓝球范围
-          if (!/^[0-9]{2}$/.test(blueBall) || parseInt(blueBall) < 1 || parseInt(blueBall) > 16) {
-            throw new Error('蓝球号码无效');
-          }
-          conditions.push('blue = ?');
-          params.push(blueBall);
+        // 蓝球查询
+        if (parts.length > 1 && parts[1] && parts[1].length > 0) {
+          const blueBalls = parts[1].split(',').map(n => n.trim()).filter(n => n);
+          blueBalls.forEach(blueBall => {
+            // 安全验证：蓝球范围
+            if (!/^[0-9]{1,2}$/.test(blueBall) || parseInt(blueBall) < 1 || parseInt(blueBall) > 16) {
+              throw new Error('蓝球号码无效');
+            }
+            const paddedBall = blueBall.padStart(2, '0');
+            conditions.push('blue = ?');
+            params.push(paddedBall);
+          });
         }
         
         return conditions.length > 0 ? {
@@ -216,7 +222,8 @@ export class HistoryAPI {
         const conditions = [];
         const params = [];
         
-        if (parts[0]) {
+        // 前区查询
+        if (parts[0] && parts[0].length > 0) {
           const frontBalls = parts[0].split(',').map(n => n.trim()).filter(n => n);
           // 安全验证：前区数量限制
           if (frontBalls.length > 5) {
@@ -225,19 +232,21 @@ export class HistoryAPI {
           
           frontBalls.forEach(ball => {
             // 安全验证：前区范围
-            if (!/^[0-9]{2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 35) {
+            if (!/^[0-9]{1,2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 35) {
               throw new Error('前区号码无效');
             }
+            const paddedBall = ball.padStart(2, '0');
             const frontConditions = [];
             for (let i = 1; i <= 5; i++) {
-              frontConditions.push(`front${i} = ?`);
-              params.push(ball);
+              frontConditions.push(\`front\${i} = ?\`);
+              params.push(paddedBall);
             }
-            conditions.push(`(${frontConditions.join(' OR ')})`);
+            conditions.push(\`(\${frontConditions.join(' OR ')})\`);
           });
         }
         
-        if (parts[1]) {
+        // 后区查询
+        if (parts.length > 1 && parts[1] && parts[1].length > 0) {
           const backBalls = parts[1].split(',').map(n => n.trim()).filter(n => n);
           // 安全验证：后区数量限制
           if (backBalls.length > 2) {
@@ -246,15 +255,16 @@ export class HistoryAPI {
           
           backBalls.forEach(ball => {
             // 安全验证：后区范围
-            if (!/^[0-9]{2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 12) {
+            if (!/^[0-9]{1,2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 12) {
               throw new Error('后区号码无效');
             }
+            const paddedBall = ball.padStart(2, '0');
             const backConditions = [];
             for (let i = 1; i <= 2; i++) {
-              backConditions.push(`back${i} = ?`);
-              params.push(ball);
+              backConditions.push(\`back\${i} = ?\`);
+              params.push(paddedBall);
             }
-            conditions.push(`(${backConditions.join(' OR ')})`);
+            conditions.push(\`(\${backConditions.join(' OR ')})\`);
           });
         }
         
@@ -281,10 +291,10 @@ export class HistoryAPI {
             }
             const numConditions = [];
             for (let i = 1; i <= 7; i++) {
-              numConditions.push(`num${i} = ?`);
+              numConditions.push(\`num\${i} = ?\`);
               params.push(num);
             }
-            conditions.push(`(${numConditions.join(' OR ')})`);
+            conditions.push(\`(\${numConditions.join(' OR ')})\`);
           });
           
           return {
@@ -298,7 +308,8 @@ export class HistoryAPI {
         const conditions = [];
         const params = [];
         
-        if (parts[0]) {
+        // 基本号查询
+        if (parts[0] && parts[0].length > 0) {
           const basicBalls = parts[0].split(',').map(n => n.trim()).filter(n => n);
           // 安全验证：基本号数量限制
           if (basicBalls.length > 7) {
@@ -307,26 +318,31 @@ export class HistoryAPI {
           
           basicBalls.forEach(ball => {
             // 安全验证：基本号范围
-            if (!/^[0-9]{2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 30) {
+            if (!/^[0-9]{1,2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 30) {
               throw new Error('基本号号码无效');
             }
+            const paddedBall = ball.padStart(2, '0');
             const basicConditions = [];
             for (let i = 1; i <= 7; i++) {
-              basicConditions.push(`basic${i} = ?`);
-              params.push(ball);
+              basicConditions.push(\`basic\${i} = ?\`);
+              params.push(paddedBall);
             }
-            conditions.push(`(${basicConditions.join(' OR ')})`);
+            conditions.push(\`(\${basicConditions.join(' OR ')})\`);
           });
         }
         
-        if (parts[1]) {
-          const specialBall = parts[1].trim();
-          // 安全验证：特别号范围
-          if (!/^[0-9]{2}$/.test(specialBall) || parseInt(specialBall) < 1 || parseInt(specialBall) > 30) {
-            throw new Error('特别号号码无效');
-          }
-          conditions.push('special = ?');
-          params.push(specialBall);
+        // 特别号查询
+        if (parts.length > 1 && parts[1] && parts[1].length > 0) {
+          const specialBalls = parts[1].split(',').map(n => n.trim()).filter(n => n);
+          specialBalls.forEach(specialBall => {
+            // 安全验证：特别号范围
+            if (!/^[0-9]{1,2}$/.test(specialBall) || parseInt(specialBall) < 1 || parseInt(specialBall) > 30) {
+              throw new Error('特别号号码无效');
+            }
+            const paddedBall = specialBall.padStart(2, '0');
+            conditions.push('special = ?');
+            params.push(paddedBall);
+          });
         }
         
         return conditions.length > 0 ? {

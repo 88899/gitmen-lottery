@@ -34,18 +34,19 @@ export const historyPageHTML = `<!DOCTYPE html>
     .header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 30px;
+      padding: 15px 30px;
       text-align: center;
     }
     
     .header h1 {
-      font-size: 28px;
-      margin-bottom: 10px;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 5px;
     }
     
     .header p {
       opacity: 0.9;
-      font-size: 14px;
+      font-size: 12px;
     }
     
     .lottery-tabs {
@@ -537,24 +538,48 @@ export const historyPageHTML = `<!DOCTYPE html>
           // 选中当前球
           this.classList.add('selected');
           
-          // 立即查询
+          // 立即查询（传递球类型）
           const value = this.dataset.value;
-          searchByBall(value);
+          const type = this.dataset.type;
+          searchByBall(value, type);
         });
       });
     }
     
     // 通过球号查询
-    function searchByBall(ballNumber) {
+    function searchByBall(ballNumber, ballType) {
       // 清空其他查询条件
       document.getElementById('issueNo').value = '';
       document.getElementById('drawDate').value = '';
       document.getElementById('numbers').value = '';
       
-      // 设置号码查询条件
-      currentFilters = {
-        numbers: ballNumber
-      };
+      // 根据球类型设置号码查询条件
+      if (currentType === 'ssq') {
+        // 双色球：红球或蓝球
+        if (ballType === 'red') {
+          currentFilters = { numbers: ballNumber }; // 只查红球
+        } else {
+          currentFilters = { numbers: '-' + ballNumber }; // 只查蓝球
+        }
+      } else if (currentType === 'dlt') {
+        // 大乐透：前区或后区
+        if (ballType === 'red') {
+          currentFilters = { numbers: ballNumber }; // 只查前区
+        } else {
+          currentFilters = { numbers: '-' + ballNumber }; // 只查后区
+        }
+      } else if (currentType === 'qxc') {
+        // 七星彩：只有号码
+        currentFilters = { numbers: ballNumber };
+      } else if (currentType === 'qlc') {
+        // 七乐彩：基本号或特别号
+        if (ballType === 'red') {
+          currentFilters = { numbers: ballNumber }; // 只查基本号
+        } else {
+          currentFilters = { numbers: '-' + ballNumber }; // 只查特别号
+        }
+      }
+      
       currentPage = 1;
       loadData();
     }
