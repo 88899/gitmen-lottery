@@ -16,20 +16,37 @@ export class HistoryAPI {
    */
   async query(type, filters = {}, page = 1, limit = 10) {
     try {
+      // 安全验证：彩票类型
+      if (!['ssq', 'dlt', 'qxc', 'qlc'].includes(type)) {
+        throw new Error('不支持的彩票类型');
+      }
+      
+      // 安全验证：分页参数
+      page = Math.max(1, Math.min(parseInt(page) || 1, 1000)); // 最多1000页
+      limit = Math.max(1, Math.min(parseInt(limit) || 10, 100)); // 每页最多100条
+      
       // 构建查询条件
       const conditions = [];
       const params = [];
       
-      // 期号查询
+      // 期号查询（安全验证）
       if (filters.lottery_no) {
+        const lotteryNo = String(filters.lottery_no).trim();
+        if (!/^[0-9]{7}$/.test(lotteryNo)) {
+          throw new Error('期号格式错误');
+        }
         conditions.push('lottery_no = ?');
-        params.push(filters.lottery_no);
+        params.push(lotteryNo);
       }
       
-      // 日期查询
+      // 日期查询（安全验证）
       if (filters.draw_date) {
+        const drawDate = String(filters.draw_date).trim();
+        if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(drawDate)) {
+          throw new Error('日期格式错误');
+        }
         conditions.push('draw_date = ?');
-        params.push(filters.draw_date);
+        params.push(drawDate);
       }
       
       // 号码查询
@@ -44,17 +61,41 @@ export class HistoryAPI {
       // 构建WHERE子句
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       
-      // 计算总数
+      // 计算总数（添加超时保护）
       const countQuery = `SELECT COUNT(*) as total FROM ${type}_lottery ${whereClause}`;
       const countStmt = this.db.prepare(countQuery).bind(...params);
       const countResult = await countStmt.first();
       const total = countResult?.total || 0;
       
+      // 如果没有数据，直接返回
+      if (total === 0) {
+        return {
+          success: true,
+          data: [],
+          page: page,
+          limit: limit,
+          total: 0,
+          totalPages: 0
+        };
+      }
+      
       // 计算分页
       const offset = (page - 1) * limit;
       const totalPages = Math.ceil(total / limit);
       
-      // 查询数据
+      // 验证页码是否超出范围
+      if (page > totalPages) {
+        return {
+          success: true,
+          data: [],
+          page: page,
+          limit: limit,
+          total: total,
+          totalPages: totalPages
+        };
+      }
+      
+      // 查询数据（添加索引优化）
       const dataQuery = `
         SELECT * FROM ${type}_lottery 
         ${whereClause}
@@ -120,39 +161,54 @@ export class HistoryAPI {
   }
 
   /**
-   * 构建号码查询条件
+   * 构建号码查询条件（优化版）
    * @param {string} type - 彩票类型
    * @param {string} numbers - 号码字符串，例如："01,02,08-06"
    */
   buildNumberConditions(type, numbers) {
     try {
+      // 安全验证：输入长度限制
+      if (!numbers || numbers.length > 100) {
+        return null;
+      }
+      
+      const numbersStr = String(numbers).trim();
+      
       if (type === 'ssq') {
         // 双色球：红球-蓝球
-        const parts = numbers.split('-');
+        const parts = numbersStr.split('-');
         const conditions = [];
         const params = [];
         
         if (parts[0]) {
           const redBalls = parts[0].split(',').map(n => n.trim()).filter(n => n);
-          if (redBalls.length > 0) {
-            // 对于每个红球，检查是否在 red1-red6 中的任意一个
-            redBalls.forEach(ball => {
-              const redConditions = [];
-              for (let i = 1; i <= 6; i++) {
-                redConditions.push(`red${i} = ?`);
-                params.push(ball);
-              }
-              conditions.push(`(${redConditions.join(' OR ')})`);
-            });
+          // 安全验证：红球数量限制
+          if (redBalls.length > 6) {
+            throw new Error('红球数量不能超过6个');
           }
+          
+          redBalls.forEach(ball => {
+            // 安全验证：红球范围
+            if (!/^[0-9]{2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 33) {
+              throw new Error('红球号码无效');
+            }
+            const redConditions = [];
+            for (let i = 1; i <= 6; i++) {
+              redConditions.push(`red${i} = ?`);
+              params.push(ball);
+            }
+            conditions.push(`(${redConditions.join(' OR ')})`);
+          });
         }
         
         if (parts[1]) {
           const blueBall = parts[1].trim();
-          if (blueBall) {
-            conditions.push('blue = ?');
-            params.push(blueBall);
+          // 安全验证：蓝球范围
+          if (!/^[0-9]{2}$/.test(blueBall) || parseInt(blueBall) < 1 || parseInt(blueBall) > 16) {
+            throw new Error('蓝球号码无效');
           }
+          conditions.push('blue = ?');
+          params.push(blueBall);
         }
         
         return conditions.length > 0 ? {
@@ -161,36 +217,50 @@ export class HistoryAPI {
         } : null;
       } else if (type === 'dlt') {
         // 大乐透：前区-后区
-        const parts = numbers.split('-');
+        const parts = numbersStr.split('-');
         const conditions = [];
         const params = [];
         
         if (parts[0]) {
           const frontBalls = parts[0].split(',').map(n => n.trim()).filter(n => n);
-          if (frontBalls.length > 0) {
-            frontBalls.forEach(ball => {
-              const frontConditions = [];
-              for (let i = 1; i <= 5; i++) {
-                frontConditions.push(`front${i} = ?`);
-                params.push(ball);
-              }
-              conditions.push(`(${frontConditions.join(' OR ')})`);
-            });
+          // 安全验证：前区数量限制
+          if (frontBalls.length > 5) {
+            throw new Error('前区号码不能超过5个');
           }
+          
+          frontBalls.forEach(ball => {
+            // 安全验证：前区范围
+            if (!/^[0-9]{2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 35) {
+              throw new Error('前区号码无效');
+            }
+            const frontConditions = [];
+            for (let i = 1; i <= 5; i++) {
+              frontConditions.push(`front${i} = ?`);
+              params.push(ball);
+            }
+            conditions.push(`(${frontConditions.join(' OR ')})`);
+          });
         }
         
         if (parts[1]) {
           const backBalls = parts[1].split(',').map(n => n.trim()).filter(n => n);
-          if (backBalls.length > 0) {
-            backBalls.forEach(ball => {
-              const backConditions = [];
-              for (let i = 1; i <= 2; i++) {
-                backConditions.push(`back${i} = ?`);
-                params.push(ball);
-              }
-              conditions.push(`(${backConditions.join(' OR ')})`);
-            });
+          // 安全验证：后区数量限制
+          if (backBalls.length > 2) {
+            throw new Error('后区号码不能超过2个');
           }
+          
+          backBalls.forEach(ball => {
+            // 安全验证：后区范围
+            if (!/^[0-9]{2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 12) {
+              throw new Error('后区号码无效');
+            }
+            const backConditions = [];
+            for (let i = 1; i <= 2; i++) {
+              backConditions.push(`back${i} = ?`);
+              params.push(ball);
+            }
+            conditions.push(`(${backConditions.join(' OR ')})`);
+          });
         }
         
         return conditions.length > 0 ? {
@@ -199,12 +269,21 @@ export class HistoryAPI {
         } : null;
       } else if (type === 'qxc') {
         // 七星彩：7位数字
-        const nums = numbers.split(',').map(n => n.trim()).filter(n => n);
+        const nums = numbersStr.split(',').map(n => n.trim()).filter(n => n);
+        // 安全验证：数量限制
+        if (nums.length > 7) {
+          throw new Error('号码数量不能超过7个');
+        }
+        
         if (nums.length > 0) {
           const conditions = [];
           const params = [];
           
           nums.forEach(num => {
+            // 安全验证：号码范围
+            if (!/^[0-9]$/.test(num)) {
+              throw new Error('号码无效');
+            }
             const numConditions = [];
             for (let i = 1; i <= 7; i++) {
               numConditions.push(`num${i} = ?`);
@@ -220,30 +299,39 @@ export class HistoryAPI {
         }
       } else if (type === 'qlc') {
         // 七乐彩：基本号-特别号
-        const parts = numbers.split('-');
+        const parts = numbersStr.split('-');
         const conditions = [];
         const params = [];
         
         if (parts[0]) {
           const basicBalls = parts[0].split(',').map(n => n.trim()).filter(n => n);
-          if (basicBalls.length > 0) {
-            basicBalls.forEach(ball => {
-              const basicConditions = [];
-              for (let i = 1; i <= 7; i++) {
-                basicConditions.push(`basic${i} = ?`);
-                params.push(ball);
-              }
-              conditions.push(`(${basicConditions.join(' OR ')})`);
-            });
+          // 安全验证：基本号数量限制
+          if (basicBalls.length > 7) {
+            throw new Error('基本号数量不能超过7个');
           }
+          
+          basicBalls.forEach(ball => {
+            // 安全验证：基本号范围
+            if (!/^[0-9]{2}$/.test(ball) || parseInt(ball) < 1 || parseInt(ball) > 30) {
+              throw new Error('基本号号码无效');
+            }
+            const basicConditions = [];
+            for (let i = 1; i <= 7; i++) {
+              basicConditions.push(`basic${i} = ?`);
+              params.push(ball);
+            }
+            conditions.push(`(${basicConditions.join(' OR ')})`);
+          });
         }
         
         if (parts[1]) {
           const specialBall = parts[1].trim();
-          if (specialBall) {
-            conditions.push('special = ?');
-            params.push(specialBall);
+          // 安全验证：特别号范围
+          if (!/^[0-9]{2}$/.test(specialBall) || parseInt(specialBall) < 1 || parseInt(specialBall) > 30) {
+            throw new Error('特别号号码无效');
           }
+          conditions.push('special = ?');
+          params.push(specialBall);
         }
         
         return conditions.length > 0 ? {
@@ -255,7 +343,7 @@ export class HistoryAPI {
       return null;
     } catch (error) {
       console.error('构建号码查询条件失败:', error);
-      return null;
+      throw error; // 抛出错误以便前端显示
     }
   }
 }

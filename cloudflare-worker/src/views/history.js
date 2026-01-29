@@ -120,6 +120,66 @@ export const historyPageHTML = `<!DOCTYPE html>
       border-color: #667eea;
     }
     
+    .ball-selector {
+      margin-top: 15px;
+      padding: 15px;
+      background: white;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+    }
+    
+    .ball-selector-title {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+    
+    .ball-selector-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+    
+    .ball-selector-group:last-child {
+      margin-bottom: 0;
+    }
+    
+    .selectable-ball {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+    }
+    
+    .selectable-ball.red {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+      color: white;
+    }
+    
+    .selectable-ball.blue {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: white;
+    }
+    
+    .selectable-ball:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .selectable-ball.selected {
+      border-color: #333;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+    }
+    
     .search-actions {
       display: flex;
       gap: 10px;
@@ -309,6 +369,12 @@ export const historyPageHTML = `<!DOCTYPE html>
         height: 28px;
         font-size: 12px;
       }
+      
+      .selectable-ball {
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+      }
     }
   </style>
 </head>
@@ -339,9 +405,15 @@ export const historyPageHTML = `<!DOCTYPE html>
           </div>
           <div class="search-field">
             <label>号码查询</label>
-            <input type="text" id="numbers" placeholder="例如：01,02,08-06">
+            <input type="text" id="numbers" placeholder="">
           </div>
         </div>
+        
+        <div class="ball-selector" id="ballSelector">
+          <div class="ball-selector-title">点选号码查询</div>
+          <div id="ballSelectorContent"></div>
+        </div>
+        
         <div class="search-actions">
           <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
           <button class="btn btn-primary" onclick="search()">查询</button>
@@ -359,6 +431,97 @@ export const historyPageHTML = `<!DOCTYPE html>
     let currentType = 'ssq';
     let currentPage = 1;
     let currentFilters = {};
+    let selectedBalls = { red: [], blue: [] };
+    
+    // 彩票配置
+    const lotteryConfig = {
+      ssq: {
+        name: '双色球',
+        placeholder: '例如：02,09,12,13,15,24-03',
+        redRange: [1, 33],
+        blueRange: [1, 16],
+        redLabel: '红球',
+        blueLabel: '蓝球'
+      },
+      dlt: {
+        name: '大乐透',
+        placeholder: '例如：22,24,29,31,35-04,11',
+        redRange: [1, 35],
+        blueRange: [1, 12],
+        redLabel: '前区',
+        blueLabel: '后区'
+      },
+      qxc: {
+        name: '七星彩',
+        placeholder: '例如：8,5,5,8,5,1,1',
+        redRange: [0, 9],
+        blueRange: null,
+        redLabel: '号码',
+        blueLabel: null
+      },
+      qlc: {
+        name: '七乐彩',
+        placeholder: '例如：04,14,19,22,26,29,30-11',
+        redRange: [1, 30],
+        blueRange: [1, 30],
+        redLabel: '基本号',
+        blueLabel: '特别号'
+      }
+    };
+    
+    // 初始化球号选择器
+    function initBallSelector() {
+      const config = lotteryConfig[currentType];
+      const content = document.getElementById('ballSelectorContent');
+      
+      let html = '';
+      
+      // 红球/前区/基本号/号码
+      html += \`<div class="ball-selector-title">\${config.redLabel}</div>\`;
+      html += '<div class="ball-selector-group">';
+      for (let i = config.redRange[0]; i <= config.redRange[1]; i++) {
+        const num = String(i).padStart(2, '0');
+        html += \`<div class="selectable-ball red" data-type="red" data-value="\${num}">\${num}</div>\`;
+      }
+      html += '</div>';
+      
+      // 蓝球/后区/特别号
+      if (config.blueRange) {
+        html += \`<div class="ball-selector-title">\${config.blueLabel}</div>\`;
+        html += '<div class="ball-selector-group">';
+        for (let i = config.blueRange[0]; i <= config.blueRange[1]; i++) {
+          const num = String(i).padStart(2, '0');
+          html += \`<div class="selectable-ball blue" data-type="blue" data-value="\${num}">\${num}</div>\`;
+        }
+        html += '</div>';
+      }
+      
+      content.innerHTML = html;
+      
+      // 绑定点击事件
+      document.querySelectorAll('.selectable-ball').forEach(ball => {
+        ball.addEventListener('click', function() {
+          const type = this.dataset.type;
+          const value = this.dataset.value;
+          
+          if (this.classList.contains('selected')) {
+            this.classList.remove('selected');
+            selectedBalls[type] = selectedBalls[type].filter(v => v !== value);
+          } else {
+            this.classList.add('selected');
+            if (!selectedBalls[type].includes(value)) {
+              selectedBalls[type].push(value);
+            }
+          }
+        });
+      });
+    }
+    
+    // 更新号码输入框提示
+    function updatePlaceholder() {
+      const config = lotteryConfig[currentType];
+      document.getElementById('numbers').placeholder = config.placeholder;
+    }
     
     // 切换彩票类型
     document.querySelectorAll('.lottery-tab').forEach(tab => {
@@ -367,6 +530,19 @@ export const historyPageHTML = `<!DOCTYPE html>
         tab.classList.add('active');
         currentType = tab.dataset.type;
         currentPage = 1;
+        
+        // 清空查询条件
+        document.getElementById('issueNo').value = '';
+        document.getElementById('drawDate').value = '';
+        document.getElementById('numbers').value = '';
+        currentFilters = {};
+        selectedBalls = { red: [], blue: [] };
+        
+        // 更新UI
+        updatePlaceholder();
+        initBallSelector();
+        
+        // 加载数据
         loadData();
       });
     });
@@ -503,12 +679,41 @@ export const historyPageHTML = `<!DOCTYPE html>
     function search() {
       const issueNo = document.getElementById('issueNo').value.trim();
       const drawDate = document.getElementById('drawDate').value;
-      const numbers = document.getElementById('numbers').value.trim();
+      const numbersInput = document.getElementById('numbers').value.trim();
       
       currentFilters = {};
-      if (issueNo) currentFilters.lottery_no = issueNo;
-      if (drawDate) currentFilters.draw_date = drawDate;
-      if (numbers) currentFilters.numbers = numbers;
+      
+      // 期号查询（安全验证）
+      if (issueNo) {
+        if (!/^[0-9]{7}$/.test(issueNo)) {
+          alert('期号格式错误，应为7位数字，例如：2025001');
+          return;
+        }
+        currentFilters.lottery_no = issueNo;
+      }
+      
+      // 日期查询
+      if (drawDate) {
+        currentFilters.draw_date = drawDate;
+      }
+      
+      // 号码查询（手动输入）
+      if (numbersInput) {
+        currentFilters.numbers = numbersInput;
+      }
+      
+      // 号码查询（点选）
+      if (selectedBalls.red.length > 0 || selectedBalls.blue.length > 0) {
+        let ballQuery = '';
+        if (selectedBalls.red.length > 0) {
+          ballQuery = selectedBalls.red.join(',');
+        }
+        if (selectedBalls.blue.length > 0) {
+          if (ballQuery) ballQuery += '-';
+          ballQuery += selectedBalls.blue.join(',');
+        }
+        currentFilters.numbers = ballQuery;
+      }
       
       currentPage = 1;
       loadData();
@@ -520,7 +725,14 @@ export const historyPageHTML = `<!DOCTYPE html>
       document.getElementById('drawDate').value = '';
       document.getElementById('numbers').value = '';
       currentFilters = {};
+      selectedBalls = { red: [], blue: [] };
       currentPage = 1;
+      
+      // 清除选中状态
+      document.querySelectorAll('.selectable-ball.selected').forEach(ball => {
+        ball.classList.remove('selected');
+      });
+      
       loadData();
     }
     
@@ -531,7 +743,9 @@ export const historyPageHTML = `<!DOCTYPE html>
       });
     });
     
-    // 初始加载
+    // 初始化
+    updatePlaceholder();
+    initBallSelector();
     loadData();
   </script>
 </body>
