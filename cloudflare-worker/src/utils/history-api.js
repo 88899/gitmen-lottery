@@ -8,7 +8,7 @@ export class HistoryAPI {
   }
 
   /**
-   * 查询历史记录
+   * 查询历史记录（优化版：优先级查询）
    * @param {string} type - 彩票类型
    * @param {Object} filters - 查询条件
    * @param {number} page - 页码
@@ -25,43 +25,38 @@ export class HistoryAPI {
       page = Math.max(1, Math.min(parseInt(page) || 1, 1000)); // 最多1000页
       limit = Math.max(1, Math.min(parseInt(limit) || 10, 100)); // 每页最多100条
       
-      // 构建查询条件
-      const conditions = [];
-      const params = [];
+      // 优先级查询：期号 > 号码 > 日期
+      let whereClause = '';
+      let params = [];
       
-      // 期号查询（安全验证）
+      // 优先级1：期号查询（精确匹配，直接返回）
       if (filters.lottery_no) {
         const lotteryNo = String(filters.lottery_no).trim();
         if (!/^[0-9]{7}$/.test(lotteryNo)) {
           throw new Error('期号格式错误');
         }
-        conditions.push('lottery_no = ?');
-        params.push(lotteryNo);
+        whereClause = 'WHERE lottery_no = ?';
+        params = [lotteryNo];
       }
-      
-      // 日期查询（安全验证）
-      if (filters.draw_date) {
+      // 优先级2：号码查询（如果没有期号查询）
+      else if (filters.numbers) {
+        const numberConditions = this.buildNumberConditions(type, filters.numbers);
+        if (numberConditions) {
+          whereClause = `WHERE ${numberConditions.condition}`;
+          params = numberConditions.params;
+        }
+      }
+      // 优先级3：日期查询（如果没有期号和号码查询）
+      else if (filters.draw_date) {
         const drawDate = String(filters.draw_date).trim();
         if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(drawDate)) {
           throw new Error('日期格式错误');
         }
-        conditions.push('draw_date = ?');
-        params.push(drawDate);
+        whereClause = 'WHERE draw_date = ?';
+        params = [drawDate];
       }
       
-      // 号码查询
-      if (filters.numbers) {
-        const numberConditions = this.buildNumberConditions(type, filters.numbers);
-        if (numberConditions) {
-          conditions.push(numberConditions.condition);
-          params.push(...numberConditions.params);
-        }
-      }
-      
-      // 构建WHERE子句
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-      
-      // 计算总数（添加超时保护）
+      // 计算总数
       const countQuery = `SELECT COUNT(*) as total FROM ${type}_lottery ${whereClause}`;
       const countStmt = this.db.prepare(countQuery).bind(...params);
       const countResult = await countStmt.first();
@@ -95,7 +90,7 @@ export class HistoryAPI {
         };
       }
       
-      // 查询数据（添加索引优化）
+      // 查询数据
       const dataQuery = `
         SELECT * FROM ${type}_lottery 
         ${whereClause}

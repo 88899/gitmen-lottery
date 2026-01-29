@@ -23,7 +23,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .container {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
       background: white;
       border-radius: 12px;
@@ -48,19 +48,16 @@ export const historyPageHTML = `<!DOCTYPE html>
       font-size: 14px;
     }
     
-    .content {
-      padding: 30px;
-    }
-    
     .lottery-tabs {
       display: flex;
       gap: 10px;
-      margin-bottom: 30px;
+      padding: 20px 30px;
       flex-wrap: wrap;
+      border-bottom: 1px solid #e0e0e0;
     }
     
     .lottery-tab {
-      padding: 12px 24px;
+      padding: 10px 20px;
       border: 2px solid #e0e0e0;
       border-radius: 8px;
       background: white;
@@ -81,37 +78,57 @@ export const historyPageHTML = `<!DOCTYPE html>
       border-color: transparent;
     }
     
-    .search-box {
-      background: #f8f9fa;
-      padding: 20px;
-      border-radius: 8px;
-      margin-bottom: 30px;
+    .main-content {
+      display: flex;
+      min-height: 600px;
     }
     
-    .search-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
+    .sidebar {
+      width: 320px;
+      background: #f8f9fa;
+      padding: 20px;
+      border-right: 1px solid #e0e0e0;
+      overflow-y: auto;
+      max-height: calc(100vh - 240px);
+    }
+    
+    .content-area {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+    }
+    
+    .search-section {
+      margin-bottom: 25px;
+    }
+    
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
       margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #667eea;
     }
     
     .search-field {
-      display: flex;
-      flex-direction: column;
+      margin-bottom: 15px;
     }
     
     .search-field label {
-      font-size: 13px;
+      display: block;
+      font-size: 12px;
       color: #666;
       margin-bottom: 5px;
       font-weight: 500;
     }
     
     .search-field input {
-      padding: 10px;
+      width: 100%;
+      padding: 8px 10px;
       border: 1px solid #ddd;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 13px;
       transition: border-color 0.3s;
     }
     
@@ -120,41 +137,63 @@ export const historyPageHTML = `<!DOCTYPE html>
       border-color: #667eea;
     }
     
-    .ball-selector {
+    .search-actions {
+      display: flex;
+      gap: 8px;
       margin-top: 15px;
-      padding: 15px;
-      background: white;
-      border-radius: 6px;
-      border: 1px solid #e0e0e0;
     }
     
-    .ball-selector-title {
+    .btn {
+      flex: 1;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
       font-size: 13px;
-      color: #666;
-      margin-bottom: 10px;
       font-weight: 500;
+      transition: all 0.3s;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-secondary {
+      background: white;
+      color: #666;
+      border: 1px solid #ddd;
+    }
+    
+    .btn-secondary:hover {
+      background: #f0f0f0;
+    }
+    
+    .ball-selector-section {
+      margin-bottom: 20px;
     }
     
     .ball-selector-group {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 15px;
-    }
-    
-    .ball-selector-group:last-child {
-      margin-bottom: 0;
+      gap: 6px;
+      margin-top: 10px;
     }
     
     .selectable-ball {
-      width: 36px;
-      height: 36px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: bold;
-      font-size: 13px;
+      font-size: 11px;
       cursor: pointer;
       transition: all 0.2s;
       border: 2px solid transparent;
@@ -171,49 +210,14 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .selectable-ball:hover {
-      transform: scale(1.1);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      transform: scale(1.15);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.2);
     }
     
     .selectable-ball.selected {
       border-color: #333;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
-    }
-    
-    .search-actions {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-    }
-    
-    .btn {
-      padding: 10px 24px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.3s;
-    }
-    
-    .btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-    
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-    
-    .btn-secondary {
-      background: white;
-      color: #666;
-      border: 1px solid #ddd;
-    }
-    
-    .btn-secondary:hover {
-      background: #f8f9fa;
+      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.4);
+      transform: scale(1.1);
     }
     
     .loading {
@@ -238,7 +242,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     
     .history-table th {
       background: #f8f9fa;
-      padding: 15px;
+      padding: 12px;
       text-align: left;
       font-weight: 600;
       color: #333;
@@ -247,9 +251,9 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .history-table td {
-      padding: 15px;
+      padding: 12px;
       border-bottom: 1px solid #f0f0f0;
-      font-size: 14px;
+      font-size: 13px;
     }
     
     .history-table tr:hover {
@@ -258,19 +262,19 @@ export const historyPageHTML = `<!DOCTYPE html>
     
     .balls-container {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
     }
     
     .ball {
-      width: 32px;
-      height: 32px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: bold;
-      font-size: 13px;
+      font-size: 11px;
       color: white;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
@@ -313,12 +317,13 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .pagination button {
-      padding: 8px 16px;
+      padding: 6px 14px;
       border: 1px solid #ddd;
       background: white;
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.3s;
+      font-size: 13px;
     }
     
     .pagination button:hover:not(:disabled) {
@@ -334,7 +339,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     
     .pagination .page-info {
       color: #666;
-      font-size: 14px;
+      font-size: 13px;
     }
     
     .empty-state {
@@ -350,30 +355,39 @@ export const historyPageHTML = `<!DOCTYPE html>
       opacity: 0.3;
     }
     
-    @media (max-width: 768px) {
-      .search-row {
-        grid-template-columns: 1fr;
+    @media (max-width: 1024px) {
+      .main-content {
+        flex-direction: column;
       }
       
+      .sidebar {
+        width: 100%;
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid #e0e0e0;
+      }
+    }
+    
+    @media (max-width: 768px) {
       .history-table {
-        font-size: 12px;
+        font-size: 11px;
       }
       
       .history-table th,
       .history-table td {
-        padding: 10px;
+        padding: 8px;
       }
       
       .ball {
-        width: 28px;
-        height: 28px;
-        font-size: 12px;
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
       }
       
       .selectable-ball {
-        width: 32px;
-        height: 32px;
-        font-size: 12px;
+        width: 26px;
+        height: 26px;
+        font-size: 10px;
       }
     }
   </style>
@@ -385,45 +399,56 @@ export const historyPageHTML = `<!DOCTYPE html>
       <p>查询双色球、大乐透、七星彩、七乐彩的历史开奖记录</p>
     </div>
     
-    <div class="content">
-      <div class="lottery-tabs">
-        <div class="lottery-tab active" data-type="ssq">双色球</div>
-        <div class="lottery-tab" data-type="dlt">大乐透</div>
-        <div class="lottery-tab" data-type="qxc">七星彩</div>
-        <div class="lottery-tab" data-type="qlc">七乐彩</div>
-      </div>
-      
-      <div class="search-box">
-        <div class="search-row">
+    <div class="lottery-tabs">
+      <div class="lottery-tab active" data-type="ssq">双色球</div>
+      <div class="lottery-tab" data-type="dlt">大乐透</div>
+      <div class="lottery-tab" data-type="qxc">七星彩</div>
+      <div class="lottery-tab" data-type="qlc">七乐彩</div>
+    </div>
+    
+    <div class="main-content">
+      <div class="sidebar">
+        <div class="search-section">
+          <div class="section-title">查询条件</div>
+          
           <div class="search-field">
             <label>期号</label>
             <input type="text" id="issueNo" placeholder="例如：2025001">
           </div>
+          
           <div class="search-field">
             <label>开奖日期</label>
             <input type="date" id="drawDate">
           </div>
+          
           <div class="search-field">
             <label>号码查询</label>
             <input type="text" id="numbers" placeholder="">
           </div>
+          
+          <div class="search-actions">
+            <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
+            <button class="btn btn-primary" onclick="search()">查询</button>
+          </div>
         </div>
         
-        <div class="ball-selector" id="ballSelector">
-          <div class="ball-selector-title">点选号码查询</div>
-          <div id="ballSelectorContent"></div>
+        <div class="ball-selector-section" id="redBallSection">
+          <div class="section-title" id="redBallTitle">红球</div>
+          <div class="ball-selector-group" id="redBallSelector"></div>
         </div>
         
-        <div class="search-actions">
-          <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
-          <button class="btn btn-primary" onclick="search()">查询</button>
+        <div class="ball-selector-section" id="blueBallSection">
+          <div class="section-title" id="blueBallTitle">蓝球</div>
+          <div class="ball-selector-group" id="blueBallSelector"></div>
         </div>
       </div>
       
-      <div id="errorMessage" class="error" style="display: none;"></div>
-      <div id="loading" class="loading" style="display: none;">加载中...</div>
-      <div id="results"></div>
-      <div id="pagination" class="pagination" style="display: none;"></div>
+      <div class="content-area">
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        <div id="loading" class="loading" style="display: none;">加载中...</div>
+        <div id="results"></div>
+        <div id="pagination" class="pagination" style="display: none;"></div>
+      </div>
     </div>
   </div>
   
@@ -431,7 +456,6 @@ export const historyPageHTML = `<!DOCTYPE html>
     let currentType = 'ssq';
     let currentPage = 1;
     let currentFilters = {};
-    let selectedBalls = { red: [], blue: [] };
     
     // 彩票配置
     const lotteryConfig = {
@@ -472,49 +496,67 @@ export const historyPageHTML = `<!DOCTYPE html>
     // 初始化球号选择器
     function initBallSelector() {
       const config = lotteryConfig[currentType];
-      const content = document.getElementById('ballSelectorContent');
       
-      let html = '';
+      // 更新标题
+      document.getElementById('redBallTitle').textContent = config.redLabel;
       
       // 红球/前区/基本号/号码
-      html += \`<div class="ball-selector-title">\${config.redLabel}</div>\`;
-      html += '<div class="ball-selector-group">';
+      const redContainer = document.getElementById('redBallSelector');
+      let redHtml = '';
       for (let i = config.redRange[0]; i <= config.redRange[1]; i++) {
         const num = String(i).padStart(2, '0');
-        html += \`<div class="selectable-ball red" data-type="red" data-value="\${num}">\${num}</div>\`;
+        redHtml += \`<div class="selectable-ball red" data-type="red" data-value="\${num}">\${num}</div>\`;
       }
-      html += '</div>';
+      redContainer.innerHTML = redHtml;
       
       // 蓝球/后区/特别号
+      const blueBallSection = document.getElementById('blueBallSection');
       if (config.blueRange) {
-        html += \`<div class="ball-selector-title">\${config.blueLabel}</div>\`;
-        html += '<div class="ball-selector-group">';
+        blueBallSection.style.display = 'block';
+        document.getElementById('blueBallTitle').textContent = config.blueLabel;
+        
+        const blueContainer = document.getElementById('blueBallSelector');
+        let blueHtml = '';
         for (let i = config.blueRange[0]; i <= config.blueRange[1]; i++) {
           const num = String(i).padStart(2, '0');
-          html += \`<div class="selectable-ball blue" data-type="blue" data-value="\${num}">\${num}</div>\`;
+          blueHtml += \`<div class="selectable-ball blue" data-type="blue" data-value="\${num}">\${num}</div>\`;
         }
-        html += '</div>';
+        blueContainer.innerHTML = blueHtml;
+      } else {
+        blueBallSection.style.display = 'none';
       }
       
-      content.innerHTML = html;
-      
-      // 绑定点击事件
+      // 绑定点击事件（点击即查询）
       document.querySelectorAll('.selectable-ball').forEach(ball => {
         ball.addEventListener('click', function() {
-          const type = this.dataset.type;
-          const value = this.dataset.value;
+          // 清除所有选中状态
+          document.querySelectorAll('.selectable-ball.selected').forEach(b => {
+            b.classList.remove('selected');
+          });
           
-          if (this.classList.contains('selected')) {
-            this.classList.remove('selected');
-            selectedBalls[type] = selectedBalls[type].filter(v => v !== value);
-          } else {
-            this.classList.add('selected');
-            if (!selectedBalls[type].includes(value)) {
-              selectedBalls[type].push(value);
-            }
-          }
+          // 选中当前球
+          this.classList.add('selected');
+          
+          // 立即查询
+          const value = this.dataset.value;
+          searchByBall(value);
         });
       });
+    }
+    
+    // 通过球号查询
+    function searchByBall(ballNumber) {
+      // 清空其他查询条件
+      document.getElementById('issueNo').value = '';
+      document.getElementById('drawDate').value = '';
+      document.getElementById('numbers').value = '';
+      
+      // 设置号码查询条件
+      currentFilters = {
+        numbers: ballNumber
+      };
+      currentPage = 1;
+      loadData();
     }
     
     // 更新号码输入框提示
@@ -536,7 +578,6 @@ export const historyPageHTML = `<!DOCTYPE html>
         document.getElementById('drawDate').value = '';
         document.getElementById('numbers').value = '';
         currentFilters = {};
-        selectedBalls = { red: [], blue: [] };
         
         // 更新UI
         updatePlaceholder();
@@ -683,37 +724,23 @@ export const historyPageHTML = `<!DOCTYPE html>
       
       currentFilters = {};
       
-      // 期号查询（安全验证）
+      // 优先级：期号 > 号码 > 日期
       if (issueNo) {
         if (!/^[0-9]{7}$/.test(issueNo)) {
           alert('期号格式错误，应为7位数字，例如：2025001');
           return;
         }
         currentFilters.lottery_no = issueNo;
-      }
-      
-      // 日期查询
-      if (drawDate) {
+      } else if (numbersInput) {
+        currentFilters.numbers = numbersInput;
+      } else if (drawDate) {
         currentFilters.draw_date = drawDate;
       }
       
-      // 号码查询（手动输入）
-      if (numbersInput) {
-        currentFilters.numbers = numbersInput;
-      }
-      
-      // 号码查询（点选）
-      if (selectedBalls.red.length > 0 || selectedBalls.blue.length > 0) {
-        let ballQuery = '';
-        if (selectedBalls.red.length > 0) {
-          ballQuery = selectedBalls.red.join(',');
-        }
-        if (selectedBalls.blue.length > 0) {
-          if (ballQuery) ballQuery += '-';
-          ballQuery += selectedBalls.blue.join(',');
-        }
-        currentFilters.numbers = ballQuery;
-      }
+      // 清除球号选中状态
+      document.querySelectorAll('.selectable-ball.selected').forEach(ball => {
+        ball.classList.remove('selected');
+      });
       
       currentPage = 1;
       loadData();
@@ -725,7 +752,6 @@ export const historyPageHTML = `<!DOCTYPE html>
       document.getElementById('drawDate').value = '';
       document.getElementById('numbers').value = '';
       currentFilters = {};
-      selectedBalls = { red: [], blue: [] };
       currentPage = 1;
       
       // 清除选中状态
