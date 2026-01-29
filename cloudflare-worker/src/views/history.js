@@ -19,7 +19,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
-      padding: 20px;
+      padding: 10px;
     }
     
     .container {
@@ -34,7 +34,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     .header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 15px 30px;
+      padding: 15px 20px;
       text-align: center;
     }
     
@@ -52,8 +52,9 @@ export const historyPageHTML = `<!DOCTYPE html>
     .toolbar {
       display: flex;
       align-items: center;
-      padding: 20px 30px;
+      padding: 15px 20px;
       border-bottom: 1px solid #e0e0e0;
+      gap: 15px;
     }
     
     .lottery-tabs {
@@ -63,7 +64,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .lottery-tab {
-      padding: 10px 20px;
+      padding: 8px 16px;
       border: 2px solid #e0e0e0;
       border-radius: 8px;
       background: white;
@@ -71,6 +72,8 @@ export const historyPageHTML = `<!DOCTYPE html>
       transition: all 0.3s;
       font-size: 14px;
       font-weight: 500;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
     }
     
     .lottery-tab:hover {
@@ -119,14 +122,19 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .btn {
-      padding: 8px 16px;
+      padding: 10px 18px;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 500;
       transition: all 0.3s;
       white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     
     .btn-primary {
@@ -135,6 +143,13 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-primary:active {
+      transform: translateY(0);
+    }
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
@@ -525,9 +540,18 @@ export const historyPageHTML = `<!DOCTYPE html>
     }
     
     @media (max-width: 1024px) {
+      body {
+        padding: 5px;
+      }
+      
+      .container {
+        border-radius: 8px;
+      }
+      
       .toolbar {
         flex-direction: column;
         align-items: stretch;
+        padding: 15px;
       }
       
       .toolbar-spacer {
@@ -536,6 +560,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       
       .lottery-tabs {
         justify-content: center;
+        margin-bottom: 10px;
       }
       
       .search-bar {
@@ -552,37 +577,205 @@ export const historyPageHTML = `<!DOCTYPE html>
         max-height: none;
         border-right: none;
         border-bottom: 1px solid #e0e0e0;
+        padding: 15px;
+      }
+      
+      .content {
+        padding: 15px;
       }
     }
     
     @media (max-width: 768px) {
+      body {
+        padding: 0;
+      }
+      
+      .container {
+        border-radius: 0;
+      }
+      
+      .header h1 {
+        font-size: 16px;
+      }
+      
+      .header p {
+        font-size: 11px;
+      }
+      
+      .lottery-tabs {
+        gap: 8px;
+      }
+      
+      .lottery-tab {
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+      
       .search-bar {
         flex-direction: column;
         align-items: stretch;
+        gap: 8px;
       }
       
       .search-input {
         width: 100%;
+        font-size: 16px;
       }
       
+      .btn {
+        width: 100%;
+        padding: 12px;
+      }
+      
+      /* 表格优化 - 卡片式布局 */
       .history-table {
-        font-size: 11px;
+        display: block;
+        font-size: 13px;
       }
       
-      .history-table th,
+      .history-table thead {
+        display: none;
+      }
+      
+      .history-table tbody {
+        display: block;
+      }
+      
+      .history-table tr {
+        display: block;
+        margin-bottom: 15px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 12px;
+        background: #fafafa;
+      }
+      
       .history-table td {
-        padding: 8px;
+        display: block;
+        text-align: left;
+        padding: 8px 0;
+        border: none;
+      }
+      
+      .history-table td:before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #666;
+        display: inline-block;
+        width: 80px;
+      }
+      
+      .history-table td:first-child {
+        font-size: 15px;
+        font-weight: 600;
+        color: #667eea;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e0e0e0;
+        margin-bottom: 8px;
+      }
+      
+      .history-table td:first-child:before {
+        content: '期号: ';
       }
       
       .ball {
-        width: 24px;
-        height: 24px;
-        font-size: 10px;
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+        margin: 2px;
       }
       
       .selectable-ball {
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+        margin: 3px;
+      }
+      
+      .ball-selector {
+        padding: 12px;
+      }
+      
+      .ball-selector h3 {
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+      
+      /* 分页优化 */
+      .pagination {
+        flex-direction: column;
+        gap: 10px;
+        padding: 15px;
+      }
+      
+      .pagination button {
+        padding: 12px;
+        font-size: 14px;
+      }
+      
+      .page-info {
+        font-size: 13px;
+        order: -1;
+      }
+      
+      /* 预测弹窗优化 */
+      .prediction-modal-content {
+        width: 95%;
+        max-width: 95%;
+        height: 90vh;
+        margin: 5vh auto;
+      }
+      
+      .prediction-header {
+        padding: 15px;
+      }
+      
+      .prediction-header h2 {
+        font-size: 16px;
+      }
+      
+      .prediction-body {
+        padding: 15px;
+      }
+      
+      .prediction-item {
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      
+      .prediction-rank {
+        font-size: 13px;
+      }
+      
+      .prediction-strategy {
+        font-size: 11px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .lottery-tabs {
+        width: 100%;
+      }
+      
+      .lottery-tab {
+        flex: 1;
+        text-align: center;
+        padding: 10px 8px;
+        font-size: 12px;
+      }
+      
+      .ball {
         width: 26px;
         height: 26px;
+        font-size: 11px;
+      }
+      
+      .selectable-ball {
+        width: 30px;
+        height: 30px;
+        font-size: 11px;
+      }
+    }
         font-size: 10px;
       }
     }
@@ -874,34 +1067,42 @@ export const historyPageHTML = `<!DOCTYPE html>
       let tableHTML = '<table class="history-table"><thead><tr>';
       tableHTML += '<th>期号</th><th>开奖日期</th>';
       
+      let label1 = '', label2 = '';
       if (currentType === 'ssq') {
         tableHTML += '<th>红球</th><th>蓝球</th>';
+        label1 = '红球';
+        label2 = '蓝球';
       } else if (currentType === 'dlt') {
         tableHTML += '<th>前区</th><th>后区</th>';
+        label1 = '前区';
+        label2 = '后区';
       } else if (currentType === 'qxc') {
         tableHTML += '<th>号码</th>';
+        label1 = '号码';
       } else if (currentType === 'qlc') {
         tableHTML += '<th>基本号</th><th>特别号</th>';
+        label1 = '基本号';
+        label2 = '特别号';
       }
       
       tableHTML += '</tr></thead><tbody>';
       
       data.forEach(item => {
         tableHTML += '<tr>';
-        tableHTML += \`<td><strong>\${item.lottery_no}</strong></td>\`;
-        tableHTML += \`<td>\${item.draw_date}</td>\`;
+        tableHTML += \`<td data-label="期号"><strong>\${item.lottery_no}</strong></td>\`;
+        tableHTML += \`<td data-label="开奖日期">\${item.draw_date}</td>\`;
         
         if (currentType === 'ssq') {
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.red_balls, 'red')}</div></td>\`;
-          tableHTML += \`<td><div class="balls-container">\${renderBall(item.blue_ball, 'blue')}</div></td>\`;
+          tableHTML += \`<td data-label="\${label1}"><div class="balls-container">\${renderBalls(item.red_balls, 'red')}</div></td>\`;
+          tableHTML += \`<td data-label="\${label2}"><div class="balls-container">\${renderBall(item.blue_ball, 'blue')}</div></td>\`;
         } else if (currentType === 'dlt') {
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.front_balls, 'front')}</div></td>\`;
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.back_balls, 'back')}</div></td>\`;
+          tableHTML += \`<td data-label="\${label1}"><div class="balls-container">\${renderBalls(item.front_balls, 'front')}</div></td>\`;
+          tableHTML += \`<td data-label="\${label2}"><div class="balls-container">\${renderBalls(item.back_balls, 'back')}</div></td>\`;
         } else if (currentType === 'qxc') {
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.numbers, 'number')}</div></td>\`;
+          tableHTML += \`<td data-label="\${label1}"><div class="balls-container">\${renderBalls(item.numbers, 'number')}</div></td>\`;
         } else if (currentType === 'qlc') {
-          tableHTML += \`<td><div class="balls-container">\${renderBalls(item.basic_balls, 'basic')}</div></td>\`;
-          tableHTML += \`<td><div class="balls-container">\${renderBall(item.special_ball, 'special')}</div></td>\`;
+          tableHTML += \`<td data-label="\${label1}"><div class="balls-container">\${renderBalls(item.basic_balls, 'basic')}</div></td>\`;
+          tableHTML += \`<td data-label="\${label2}"><div class="balls-container">\${renderBall(item.special_ball, 'special')}</div></td>\`;
         }
         
         tableHTML += '</tr>';
