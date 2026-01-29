@@ -995,6 +995,13 @@ export const historyPageHTML = `<!DOCTYPE html>
     initBallSelector();
     loadData();
     
+    // 点击弹窗外部关闭
+    document.getElementById('predictionModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closePrediction();
+      }
+    });
+    
     // 显示预测
     async function showPrediction() {
       const modal = document.getElementById('predictionModal');
@@ -1108,13 +1115,6 @@ export const historyPageHTML = `<!DOCTYPE html>
     function closePrediction() {
       document.getElementById('predictionModal').classList.remove('show');
     }
-    
-    // 点击弹窗外部关闭
-    document.getElementById('predictionModal').addEventListener('click', function(e) {
-      if (e.target === this) {
-        closePrediction();
-      }
-    });
     
     // 复制弹窗中的预测结果到剪贴板
     function copyModalToClipboard() {
