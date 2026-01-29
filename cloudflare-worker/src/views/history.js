@@ -1127,158 +1127,6 @@ export const historyPageHTML = `<!DOCTYPE html>
       newWindow.document.write(htmlParts.join('\n'));
       newWindow.document.close();
     }
-  
-  <script>
-    const textContent = \\\`\${textContent.replace(/`/g, '\\\\`').replace(/\$/g, '\\$')}\\\`;
-    
-    function copyToClipboard() {
-      const btn = document.querySelector('.btn-copy');
-      
-      navigator.clipboard.writeText(textContent).then(() => {
-        btn.textContent = '✓ 已复制';
-        btn.classList.add('copied');
-        
-        setTimeout(() => {
-          btn.textContent = '📋 复制到剪贴板';
-          btn.classList.remove('copied');
-        }, 2000);
-      }).catch(err => {
-        alert('复制失败: ' + err.message);
-      });
-    }
-  </script>
-</body>
-</html>
-      \`;
-      
-      newWindow.document.write(html);
-      newWindow.document.close();
-    }
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.3s;
-    }
-    .btn-copy {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      color: white;
-    }
-    .btn-copy:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
-    }
-    .btn-copy.copied {
-      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-    }
-    .content {
-      padding: 30px;
-    }
-    .prediction-item {
-      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-left: 4px solid #667eea;
-    }
-    .prediction-rank {
-      display: inline-block;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 6px 14px;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: bold;
-      margin-right: 10px;
-    }
-    .prediction-strategy {
-      display: inline-block;
-      background: white;
-      color: #666;
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      margin-left: 10px;
-    }
-    .prediction-balls {
-      margin-top: 15px;
-    }
-    .balls-container {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .ball {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 14px;
-      color: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .ball-red { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
-    .ball-blue { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-    .ball-front { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
-    .ball-back { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-    .ball-basic { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
-    .ball-special { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-    .ball-number { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
-    .footer {
-      padding: 20px 30px;
-      text-align: center;
-      color: #999;
-      font-size: 12px;
-      border-top: 1px solid #e0e0e0;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>🎲 \${config.name} - 预测结果</h1>
-      <p>生成时间：\${new Date().toLocaleString('zh-CN')}</p>
-    </div>
-    <div class="toolbar">
-      <div>共 \${predictions.length} 注预测</div>
-      <button class="btn btn-copy" onclick="copyToClipboard()">📋 复制到剪贴板</button>
-    </div>
-    <div class="content">
-      \${renderPredictionsHTML(predictions)}
-    </div>
-    <div class="footer">
-      <p>⚠️ 预测结果仅供参考，不构成任何投注建议</p>
-    </div>
-  </div>
-  
-  <script>
-    const textContent = \\\`\${textContent.replace(/`/g, '\\\\`')}\\\`;
-    
-    function copyToClipboard() {
-      const btn = document.querySelector('.btn-copy');
-      
-      navigator.clipboard.writeText(textContent).then(() => {
-        btn.textContent = '✓ 已复制';
-        btn.classList.add('copied');
-        
-        setTimeout(() => {
-          btn.textContent = '📋 复制到剪贴板';
-          btn.classList.remove('copied');
-        }, 2000);
-      }).catch(err => {
-        alert('复制失败: ' + err.message);
-      });
-    }
-  </script>
-</body>
-</html>
-      \`;
-      
-      newWindow.document.write(html);
-      newWindow.document.close();
-    }
     
     // 生成预测结果的文本格式
     function generatePredictionText(predictions, config) {
@@ -1317,33 +1165,33 @@ export const historyPageHTML = `<!DOCTYPE html>
       
       predictions.forEach(pred => {
         html += '<div class="prediction-item">';
-        html += `<div>`;
-        html += `<span class="prediction-rank">第 ${pred.rank} 注</span>`;
-        html += `<span class="prediction-strategy">${pred.strategy_name || pred.strategy}</span>`;
-        html += `</div>`;
+        html += '<div>';
+        html += '<span class="prediction-rank">第 ' + pred.rank + ' 注</span>';
+        html += '<span class="prediction-strategy">' + (pred.strategy_name || pred.strategy) + '</span>';
+        html += '</div>';
         html += '<div class="prediction-balls"><div class="balls-container">';
         
         if (currentType === 'ssq') {
           pred.red_balls.forEach(ball => {
-            html += `<div class="ball ball-red">${ball}</div>`;
+            html += '<div class="ball ball-red">' + ball + '</div>';
           });
-          html += `<div class="ball ball-blue">${pred.blue_ball}</div>`;
+          html += '<div class="ball ball-blue">' + pred.blue_ball + '</div>';
         } else if (currentType === 'dlt') {
           pred.front_balls.forEach(ball => {
-            html += `<div class="ball ball-front">${ball}</div>`;
+            html += '<div class="ball ball-front">' + ball + '</div>';
           });
           pred.back_balls.forEach(ball => {
-            html += `<div class="ball ball-back">${ball}</div>`;
+            html += '<div class="ball ball-back">' + ball + '</div>';
           });
         } else if (currentType === 'qxc') {
           pred.numbers.forEach(ball => {
-            html += `<div class="ball ball-number">${ball}</div>`;
+            html += '<div class="ball ball-number">' + ball + '</div>';
           });
         } else if (currentType === 'qlc') {
           pred.basic_balls.forEach(ball => {
-            html += `<div class="ball ball-basic">${ball}</div>`;
+            html += '<div class="ball ball-basic">' + ball + '</div>';
           });
-          html += `<div class="ball ball-special">${pred.special_ball}</div>`;
+          html += '<div class="ball ball-special">' + pred.special_ball + '</div>';
         }
         
         html += '</div></div></div>';
