@@ -52,10 +52,8 @@ export const historyPageHTML = `<!DOCTYPE html>
     .toolbar {
       display: flex;
       align-items: center;
-      gap: 20px;
       padding: 20px 30px;
       border-bottom: 1px solid #e0e0e0;
-      flex-wrap: wrap;
     }
     
     .lottery-tabs {
@@ -64,32 +62,14 @@ export const historyPageHTML = `<!DOCTYPE html>
       flex-wrap: wrap;
     }
     
-    .lottery-tab {
-      padding: 10px 20px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      background: white;
-      cursor: pointer;
-      transition: all 0.3s;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    
-    .lottery-tab:hover {
-      border-color: #667eea;
-      color: #667eea;
-    }
-    
-    .lottery-tab.active {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border-color: transparent;
+    .toolbar-spacer {
+      flex: 1;
+      min-width: 20px;
     }
     
     .search-bar {
       display: flex;
       gap: 10px;
-      flex: 1;
       align-items: center;
       flex-wrap: wrap;
     }
@@ -359,8 +339,17 @@ export const historyPageHTML = `<!DOCTYPE html>
         align-items: stretch;
       }
       
+      .toolbar-spacer {
+        display: none;
+      }
+      
+      .lottery-tabs {
+        justify-content: center;
+      }
+      
       .search-bar {
         width: 100%;
+        justify-content: center;
       }
       
       .main-content {
@@ -422,6 +411,8 @@ export const historyPageHTML = `<!DOCTYPE html>
         <div class="lottery-tab" data-type="qxc">七星彩</div>
         <div class="lottery-tab" data-type="qlc">七乐彩</div>
       </div>
+      
+      <div class="toolbar-spacer"></div>
       
       <div class="search-bar">
         <input type="text" id="issueNo" class="search-input" placeholder="期号：2025001">
@@ -506,7 +497,8 @@ export const historyPageHTML = `<!DOCTYPE html>
       const redContainer = document.getElementById('redBallSelector');
       let redHtml = '';
       for (let i = config.redRange[0]; i <= config.redRange[1]; i++) {
-        const num = String(i).padStart(2, '0');
+        // 七星彩不补零，其他彩票补零
+        const num = currentType === 'qxc' ? String(i) : String(i).padStart(2, '0');
         redHtml += \`<div class="selectable-ball red" data-type="red" data-value="\${num}">\${num}</div>\`;
       }
       redContainer.innerHTML = redHtml;

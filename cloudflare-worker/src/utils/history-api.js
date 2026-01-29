@@ -273,7 +273,7 @@ export class HistoryAPI {
           params: params
         } : null;
       } else if (type === 'qxc') {
-        // 七星彩：7位数字
+        // 七星彩：7位数字（0-9）
         const nums = numbersStr.split(',').map(n => n.trim()).filter(n => n);
         // 安全验证：数量限制
         if (nums.length > 7) {
@@ -285,14 +285,16 @@ export class HistoryAPI {
           const params = [];
           
           nums.forEach(num => {
+            // 移除前导零（如果有）
+            const cleanNum = String(parseInt(num));
             // 安全验证：号码范围
-            if (!/^[0-9]$/.test(num)) {
+            if (!/^[0-9]$/.test(cleanNum)) {
               throw new Error('号码无效');
             }
             const numConditions = [];
             for (let i = 1; i <= 7; i++) {
               numConditions.push(`num${i} = ?`);
-              params.push(num);
+              params.push(cleanNum);
             }
             conditions.push(`(${numConditions.join(' OR ')})`);
           });
