@@ -42,6 +42,11 @@ python lottery.py predict qxc
 
 # 6. 定时任务（自动增量 + 预测）
 python lottery.py schedule
+
+# 7. Web 服务（FastAPI）
+python web/main.py
+# 访问 http://localhost:8000/history 查看历史记录
+# 访问 http://localhost:8000/docs 查看 API 文档
 ```
 
 ### Cloudflare Workers 版本
@@ -64,11 +69,9 @@ curl https://your-worker.workers.dev/predict/qxc
 
 ## 📖 文档
 
-- [架构说明](./docs/ARCHITECTURE.md) - 系统架构和设计
 - [Worker 版本](./cloudflare-worker/README.md) - Worker 使用说明
-- [API 文档](./cloudflare-worker/API_USAGE.md) - API 接口说明
+- [Web 服务](./web/README.md) - FastAPI Web 服务说明
 - [Telegram 设置](./docs/guides/TELEGRAM_SETUP.md) - Telegram 配置指南
-- [质量保证](./scripts/README.md) - 检查清单和验证脚本 ⭐
 
 ## 🎲 支持的彩票
 
@@ -173,6 +176,10 @@ lottery-predictor/
 │   ├── schedule.py    # 定时任务
 │   └── smart_fetch.py # 智能爬取核心
 ├── core/              # 核心模块
+├── web/               # FastAPI Web 服务
+│   ├── main.py        # 主入口
+│   ├── routers/       # 路由模块
+│   └── templates/     # 页面模板
 ├── cloudflare-worker/ # Worker 版本
 ├── scripts/           # 质量保证脚本 ⭐
 │   ├── README.md                  # 脚本使用说明
@@ -213,31 +220,24 @@ TELEGRAM_SEND_TO_CHANNEL=false             # 是否发送给频道
 TELEGRAM_PROXY=http://127.0.0.1:7890  # 代理地址，根据你的代理工具调整端口
 ```
 
-## 🔄 最新更新（2025-11-19）
+## 🔄 最新更新
+
+### 📱 FastAPI Web 服务
+- **新功能**：完整的Web服务，支持历史查询和预测
+- **技术栈**：FastAPI + MySQL (TiDB Cloud)
+- **功能完整**：历史记录查询、预测、统计、球号点选查询
+- **界面友好**：响应式设计，支持所有四种彩票类型
 
 ### 📢 Telegram 频道支持
 - **新功能**：支持同时发送消息到 Telegram 机器人和频道
 - **灵活配置**：可选择发送给机器人、频道或两者
 - **统一接口**：Python 和 Cloudflare Worker 版本保持一致
-- **配置文档**：[Telegram 频道设置指南](./docs/TELEGRAM_CHANNEL_SETUP.md)
 
-### 🎯 预测策略配置修复
-- **修复问题**：预测器只使用 `frequency` 策略，忽略 `.env` 配置
-- **根本原因**：所有预测器调用都没有传入 `strategies` 参数
-- **修复文件**：`cli/fetch.py`、`cli/predict.py`、`cli/schedule.py`
-
-### 📱 Telegram 消息格式优化
-- **分开发送**：每种彩票分别发送，避免消息过长
-- **格式清晰**：每个组合单独显示，策略名称明确标注
-- **等宽字体**：使用 `<code>` 标签确保号码对齐
-- **简洁明了**：去除冗余信息，专注于预测结果
-- **修复效果**：现在完全按照 `.env` 中的 `DEFAULT_STRATEGIES` 配置工作
-
-### 📊 多策略预测增强
-- **配置示例**：`DEFAULT_STRATEGIES=frequency,balanced,coldHot,random`
-- **预测结果**：每种策略生成指定数量组合（如 4策略×5组=20组）
+### 🎯 预测策略配置
+- **多策略支持**：frequency、balanced、coldHot、random
+- **灵活配置**：通过 `.env` 自由调整策略组合
+- **预测结果**：每种策略生成指定数量组合
 - **日志显示**：清晰显示每种策略的使用和生成结果
-- **灵活配置**：可通过 `.env` 自由调整策略组合
 
 ### 🔧 系统架构优化
 1. **统一爬虫接口**
