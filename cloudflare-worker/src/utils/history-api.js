@@ -46,10 +46,7 @@ export class HistoryAPI {
       
       // 计算总数
       const countQuery = `SELECT COUNT(*) as total FROM ${type}_lottery ${whereClause}`;
-      let countStmt = this.db.prepare(countQuery);
-      for (const param of params) {
-        countStmt = countStmt.bind(param);
-      }
+      const countStmt = this.db.prepare(countQuery).bind(...params);
       const countResult = await countStmt.first();
       const total = countResult?.total || 0;
       
@@ -64,10 +61,7 @@ export class HistoryAPI {
         ORDER BY lottery_no DESC 
         LIMIT ? OFFSET ?
       `;
-      let dataStmt = this.db.prepare(dataQuery);
-      for (const param of [...params, limit, offset]) {
-        dataStmt = dataStmt.bind(param);
-      }
+      const dataStmt = this.db.prepare(dataQuery).bind(...params, limit, offset);
       const dataResult = await dataStmt.all();
       
       // 转换数据格式
