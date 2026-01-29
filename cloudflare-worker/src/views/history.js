@@ -480,7 +480,7 @@ export const historyPageHTML = `<!DOCTYPE html>
     const lotteryConfig = {
       ssq: {
         name: '双色球',
-        placeholder: '例如：02,06,08,12,22,31-03 或 08',
+        placeholder: '例如：02,06,08,12,22,31-03',
         redRange: [1, 33],
         blueRange: [1, 16],
         redLabel: '红球',
@@ -488,7 +488,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       },
       dlt: {
         name: '大乐透',
-        placeholder: '例如：01,02,03,04,05-06,07 或 08',
+        placeholder: '例如：01,02,03,04,05-06,07',
         redRange: [1, 35],
         blueRange: [1, 12],
         redLabel: '前区',
@@ -496,7 +496,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       },
       qxc: {
         name: '七星彩',
-        placeholder: '例如：8,5,5,8,5,1,1 或 8',
+        placeholder: '例如：8,5,5,8,5,1,1',
         redRange: [0, 9],
         blueRange: null,
         redLabel: '号码',
@@ -504,7 +504,7 @@ export const historyPageHTML = `<!DOCTYPE html>
       },
       qlc: {
         name: '七乐彩',
-        placeholder: '例如：04,14,19,22,26,29,30-11 或 08',
+        placeholder: '例如：04,14,19,22,26,29,30-11',
         redRange: [1, 30],
         blueRange: [1, 30],
         redLabel: '基本号',

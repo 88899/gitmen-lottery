@@ -159,10 +159,10 @@ export class HistoryAPI {
    * 构建号码查询条件（优化版 - 使用 sorted_code）
    * @param {string} type - 彩票类型
    * @param {string} numbers - 号码字符串
-   *   - 双色球："02,06,08,12,22,31-22" 或 "08"（查询包含该号码）
-   *   - 大乐透："01,02,03,04,05-06,07" 或 "08"（查询包含该号码）
+   *   - 双色球："02,06,08,12,22,31-22" 或 "08"（查询包含该号码）或 "-03"（只查蓝球）
+   *   - 大乐透："01,02,03,04,05-06,07" 或 "08"（查询包含该号码）或 "-06"（只查后区）
    *   - 七星彩："8,5,5,8,5,1,1"（用户输入位置顺序，需要转换为排序后的格式）
-   *   - 七乐彩："04,14,19,22,26,29,30-11" 或 "08"（查询包含该号码）
+   *   - 七乐彩："04,14,19,22,26,29,30-11" 或 "08"（查询包含该号码）或 "-11"（只查特别号）
    */
   buildNumberConditions(type, numbers) {
     try {
@@ -172,6 +172,19 @@ export class HistoryAPI {
       }
       
       const numbersStr = String(numbers).trim();
+      
+      // 特殊处理：只查询蓝球/后区/特别号（以 - 开头）
+      if (numbersStr.startsWith('-')) {
+        const ballNumber = numbersStr.substring(1).trim();
+        if (!ballNumber) return null;
+        
+        // 对于蓝球/后区/特别号，使用 LIKE 查询 "-XX" 或 "-XX,XX" 格式
+        const searchPattern = '-' + ballNumber.padStart(2, '0');
+        return {
+          condition: 'sorted_code LIKE ?',
+          params: [`%${searchPattern}%`]
+        };
+      }
       
       // 检查是否是完整的号码组合（包含分隔符 - 或逗号）
       const hasFullFormat = numbersStr.includes(',') || numbersStr.includes('-');
